@@ -19,8 +19,8 @@ import org.glassfish.jersey.server.spi.ContainerLifecycleListener;
 import org.joints.commons.FileMonitor;
 import org.joints.commons.MiscUtils;
 import org.joints.commons.ProcTrace;
+import org.joints.commons.ScriptUtils;
 import org.joints.rest.ajax.AjaxResContext;
-import org.joints.web.joint.script.ScriptUtils;
 import org.joints.web.mvc.ResCacheMgr;
 
 import javax.script.Invocable;
@@ -152,16 +152,35 @@ public class ScriptResLoader extends ResourceConfig {
                 return Collections.emptySet();
             }
 
-//            ScriptContext sc = new SimpleScriptContext();
-//            Bindings bindings = sc.getBindings(ScriptContext.GLOBAL_SCOPE);
-//            if (bindings == null) {
-//                log.debug("bindings are null, need initialization");
-//                bindings = se.createBindings();
-//                sc.setBindings(bindings, ScriptContext.GLOBAL_SCOPE);
-//                bindings.put("Application", this);
-//            }
+            Object evaluated = se.eval(scriptStr);
 
-            se.eval(scriptStr);
+            if (evaluated instanceof Resource) {
+                Resource res = (Resource) evaluated;
+                return new HashSet<Resource>(Arrays.asList(res));
+            }
+
+            if (evaluated instanceof Set) {
+                Set set = (Set) evaluated;
+                if (CollectionUtils.isEmpty(set)) {
+                    return Collections.emptySet();
+                }
+
+                return (Set<Resource>) set.stream().filter(Objects::nonNull).map(obj -> {
+                    if (obj instanceof Resource) return (Resource) obj;
+                    if (obj instanceof Class) return Resource.from((Class) obj);
+                    return null;
+                }).filter(Objects::nonNull).collect(Collectors.toSet());
+            }
+
+            if (evaluated instanceof IResourceGenerator) {
+                IResourceGenerator resGen = (IResourceGenerator) evaluated;
+                return resGen.apply(this);
+            }
+
+            if (!(se instanceof Invocable)) {
+                return Collections.emptySet();
+            }
+
             Invocable inv = (Invocable) se;
             IResourceGenerator resGen = inv.getInterface(IResourceGenerator.class);
             if (resGen == null) {
@@ -169,7 +188,7 @@ public class ScriptResLoader extends ResourceConfig {
                 return Collections.emptySet();
             }
             Set<Resource> resourceSet = resGen.apply(this);
-            scriptPathAndResources.put(file.toPath(), resourceSet);
+//            scriptPathAndResources.put(file.toPath(), resourceSet);
             return resourceSet;
         } catch (IOException e) {
             log.error("fail to execute script file: ", e);

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!DOCTYPE Configure PUBLIC "-//Jetty//Configure//EN" "http://www.eclipse.org/jetty/configure_9_0.dtd">
+<Configure class="org.eclipse.jetty.webapp.WebAppContext">
+	<Call name="prependServerClass">
+		<Arg>-org.eclipse.jetty.servlet.</Arg>
+	</Call>
+	<Call name="prependServerClass">
+		<Arg>-org.eclipse.jetty.server.</Arg>
+	</Call>
+	<Call name="prependServerClass">
+		<Arg>org.apache.tomcat.InstanceManager</Arg>
+	</Call>
+</Configure>
+<!--
+
+because Jetty has some weird class loading mechanism 
+some classes needed by Weld are hidden.
+
+so we have to call this mojo "prependServerClass" to reveal them to Weld
+ 
+ -->

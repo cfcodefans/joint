@@ -1,17 +1,11 @@
-package org.joints.web.joint.script;
+package org.joints.commons;
 
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.joints.web.mvc.ResCacheMgr;
-import org.jsoup.nodes.Element;
-import org.jsoup.nodes.TextNode;
 
 import javax.script.*;
-import javax.servlet.ServletContext;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class ScriptUtils {
@@ -30,14 +24,6 @@ public class ScriptUtils {
 			log.error(errorMessage, e);
 		}
 		return null;
-	}
-	
-	public static String getScriptStr(Element scriptElement) {
-		if (scriptElement == null) {
-			return StringUtils.EMPTY;
-		}
-		List<TextNode> textNodes = scriptElement.textNodes();
-		return (CollectionUtils.isNotEmpty(textNodes)) ? textNodes.get(0).getWholeText() : scriptElement.data();
 	}
 
 	public static ScriptEngine getScriptEngineByMimeType(String mimeType) {
@@ -78,13 +64,4 @@ public class ScriptUtils {
 		}
 	}
 
-	public static String getScriptStr(ServletContext servletContext, String refPath, Element scriptElement) {
-		String srcPath = scriptElement.attr("src");
-
-		if (StringUtils.isBlank(srcPath)) {
-			return getScriptStr(scriptElement);
-		}
-		
-		return ResCacheMgr.getTextResource(refPath, srcPath);
-	}
 }

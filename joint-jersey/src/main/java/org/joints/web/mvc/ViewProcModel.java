@@ -3,7 +3,7 @@ package org.joints.web.mvc;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.joints.web.joint.script.ScriptUtils;
+import org.joints.web.joint.script.PageScriptExecutionContext;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
@@ -92,7 +92,7 @@ public class ViewProcModel implements Serializable {
 		// use the path to locate the script elements for better performance
 		List<Pair<Element, String>> _scriptElementList = scriptCtxModelList.stream().map(cm -> {
 				Element scriptElement = cm.getScriptElementByPath(_doc);
-				return new ImmutablePair<Element, String>(scriptElement, ScriptUtils.getScriptStr(scriptElement));
+				return new ImmutablePair<Element, String>(scriptElement, PageScriptExecutionContext.getScriptStr(scriptElement));
 			}).collect(Collectors.toList());
 		return new ViewFacade(_doc, _scriptElementList);
 	}

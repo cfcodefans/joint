@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="3.0" xmlns="http://java.sun.com/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd">
+
+    <display-name>joint-tests</display-name>
+        <servlet>
+            <servlet-name>ScriptResLoader</servlet-name>
+            <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
+            <init-param>
+                <param-name>javax.ws.rs.Application</param-name>
+                <param-value>org.joints.rest.script.ScriptResLoader</param-value>
+            </init-param>
+            <init-param>
+                <param-name>script-path</param-name>
+                <param-value>WEB-INF/scripts</param-value>
+            </init-param>
+            <init-param>
+                <param-name>jersey.config.server.application.name</param-name>
+                <param-value>rest-script</param-value>
+            </init-param>
+            <load-on-startup>3</load-on-startup>
+            <async-supported>true</async-supported>
+        </servlet>
+        <servlet-mapping>
+            <servlet-name>ScriptResLoader</servlet-name>
+            <url-pattern>/rest/scripts/v1/*</url-pattern>
+        </servlet-mapping>
+
+            <servlet>
+                <servlet-name>ResLoader</servlet-name>
+                <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
+                <init-param>
+                    <param-name>javax.ws.rs.Application</param-name>
+                    <param-value>org.joints.rest.ajax.AjaxResLoader</param-value>
+                </init-param>
+                <init-param>
+                    <param-name>jersey.config.server.application.name</param-name>
+                    <param-value>rest-ajax</param-value>
+                </init-param>
+                <init-param>
+                    <param-name>jersey.config.server.provider.packages</param-name>
+                    <param-value>
+                        org.joints.rest.ajax
+                    </param-value>
+                </init-param>
+                <init-param>
+                    <param-name>jersey.config.server.provider.classnames</param-name>
+                    <param-value>org.glassfish.jersey.ext.cdi1x.internal.CdiComponentProvider</param-value>
+                </init-param>
+                <load-on-startup>2</load-on-startup>
+                <async-supported>true</async-supported>
+            </servlet>
+            <servlet-mapping>
+                <servlet-name>ResLoader</servlet-name>
+                <url-pattern>/rest/v1/*</url-pattern>
+            </servlet-mapping>
+            <servlet>
+                <servlet-name>JerseyController</servlet-name>
+                <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
+                <init-param>
+                    <param-name>javax.ws.rs.Application</param-name>
+                    <param-value>org.joints.web.mvc.MvcResLoader</param-value>
+                </init-param>
+                <init-param>
+                    <param-name>jersey.config.server.provider.packages</param-name>
+                    <param-value>org.joints.web.mvc</param-value>
+                </init-param>
+                <init-param>
+                    <param-name>jersey.config.server.mvc.templateBasePath</param-name>
+                    <param-value>pages</param-value>
+                </init-param>
+                <init-param>
+                    <param-name>joint.jersey.mvc.base</param-name>
+                    <param-value>pages</param-value>
+                </init-param>
+                <load-on-startup>1</load-on-startup>
+                <async-supported>true</async-supported>
+            </servlet>
+
+            <servlet-mapping>
+                <servlet-name>JerseyController</servlet-name>
+                <url-pattern>/mvc/*</url-pattern>
+            </servlet-mapping>
+
+    <servlet>
+        <servlet-name>hide</servlet-name>
+        <servlet-class>org.eclipse.jetty.servlet.DefaultServlet</servlet-class>
+        <init-param>
+            <param-name>dirAllowed</param-name>
+            <param-value>false</param-value>
+        </init-param>
+        <init-param>
+            <param-name>redirectWelcome</param-name>
+            <param-value>true</param-value>
+        </init-param>
+
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>hide</servlet-name>
+        <url-pattern>/pages/*</url-pattern>
+    </servlet-mapping>
+
+    <welcome-file-list>
+        <welcome-file>/index.html</welcome-file>
+    </welcome-file-list>
+</web-app>

@@ -17,6 +17,7 @@
         <module>joint-commons</module>
         <module>joint-jersey</module>
         <module>joint-rabbitmq</module>
+        <module>tests</module>
     </modules>
 
     <dependencies>
