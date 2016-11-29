@@ -1,5 +1,4 @@
 
-import java.util
 import javax.ws.rs.container.ContainerRequestContext
 import javax.ws.rs.core.{Application, MediaType, Response}
 
@@ -9,7 +8,7 @@ import org.joints.rest.script.ScriptResLoader.IResourceGenerator
 import scala.collection.JavaConverters._
 
 class ScalaResGenerator extends IResourceGenerator {
-    override def apply(app: Application): util.Set[Resource] = {
+    override def apply(app: Application): java.util.Set[Resource] = {
         val rb: Resource.Builder = Resource.builder("scala")
 
         {
