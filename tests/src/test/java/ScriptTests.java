@@ -4,6 +4,8 @@ import org.glassfish.jersey.server.model.Resource;
 import org.joints.commons.MiscUtils;
 import org.joints.rest.script.ScriptResLoader;
 import org.junit.Test;
+import scala.reflect.internal.util.ScalaClassLoader;
+import scala.reflect.internal.util.ScalaClassLoader$;
 
 import javax.script.*;
 import java.io.File;
@@ -27,6 +29,7 @@ public class ScriptTests {
         String loadResAsString = FileUtils.readFileToString(new File("src/test/resources/rest-tests.scala.code"), Charset.defaultCharset());
         System.out.println(MiscUtils.lineNumber(loadResAsString));
 
+        ScalaClassLoader.
         Set<Resource> resourceSet = tryEval(se, loadResAsString);
         System.out.println(resourceSet);
     }
