@@ -1,0 +1,7 @@
+//val t = java.lang.Thread.currentThread
+//val cl = t.getContextClassLoader
+////cl
+//val clplus = new java.lang.ClassLoader(cl) with scala.reflect.internal.util.ScalaClassLoader
+//clplus
+
+app.now

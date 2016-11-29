@@ -24,6 +24,7 @@ import org.joints.rest.ajax.AjaxResContext;
 import org.joints.web.mvc.ResCacheMgr;
 
 import javax.script.Invocable;
+import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 import javax.ws.rs.core.Application;
@@ -47,28 +48,7 @@ import static java.nio.file.StandardWatchEventKinds.*;
 
 public class ScriptResLoader extends ResourceConfig {
 
-    private static class ContainerHolder implements ContainerLifecycleListener {
-        @Override
-        public void onStartup(Container container) {
-            log.info("ScriptResLoader.container = {}", container);
-            instance.container = container;
-            instance.container.getConfiguration().getProperties().get(SCRIPT_PATH);
-        }
-
-        @Override
-        public void onReload(Container container) {
-        }
-
-        @Override
-        public void onShutdown(Container container) {
-
-        }
-    }
-
     public static final String SCRIPT_PATH = "script-path";
-    public static final FileFilter SCRIPT_EXTS = new OrFileFilter(Arrays.asList(
-        new WildcardFileFilter("*.js"),
-        new WildcardFileFilter("*.scala")));
     private static final Logger log = LogManager.getLogger(ScriptResLoader.class);
     private static ScriptResLoader instance = null;
     protected Container container = null;
@@ -85,7 +65,7 @@ public class ScriptResLoader extends ResourceConfig {
         register(EncodingFilter.class);
         register(GZipEncoder.class);
         register(DeflateEncoder.class);
-        register(new ContainerHolder());
+        register(new ContainerListener());
 
         ProcTrace.end();
         log.info(ProcTrace.flush());
@@ -94,13 +74,13 @@ public class ScriptResLoader extends ResourceConfig {
 
         String[] pathStrs = getScriptPaths();
         final String realResPath = ResCacheMgr.getRealResPath("WEB-INF/" + pathStrs[0]);
-        Stream.of(pathStrs).parallel()
+        Stream.of(pathStrs)
             .map(pathStr -> realResPath)
             .map(Paths::get)
             .filter(Files::exists)
             .map(Path::toFile)
             .filter(File::isDirectory)
-            .map(dir -> dir.listFiles(SCRIPT_EXTS))
+            .map(dir -> dir.listFiles(getFileFilter()))
             .flatMap(Stream::of)
             .forEach(file -> scriptPathAndResources.put(file.toPath(), executeScriptFile(file)));
 
@@ -109,6 +89,63 @@ public class ScriptResLoader extends ResourceConfig {
         prepareResourceConfig(resSet, this);
 
         startWatchScriptFolder(realResPath);
+    }
+
+    protected Set<Resource> tryEvalForResources(ScriptEngine se, String scriptStr) throws ScriptException {
+        Object evaluated = null;
+//        if (se instanceof Compilable) {
+//            Compilable cpl = (Compilable) se;
+//            evaluated = cpl.compile(scriptStr).eval();
+//        } else {
+            evaluated = se.eval(scriptStr);
+//        }
+
+        if (evaluated instanceof Class) {
+            Class clz = (Class) evaluated;
+            Resource res = Resource.from(clz);
+            return new HashSet<Resource>(Arrays.asList(res));
+        }
+
+        if (evaluated instanceof Resource) {
+            Resource res = (Resource) evaluated;
+            return new HashSet<Resource>(Arrays.asList(res));
+        }
+
+        if (evaluated instanceof Set) {
+            Set set = (Set) evaluated;
+            if (CollectionUtils.isEmpty(set)) {
+                return Collections.emptySet();
+            }
+
+            return (Set<Resource>) set.stream().filter(Objects::nonNull).map(obj -> {
+                if (obj instanceof Resource) return (Resource) obj;
+                if (obj instanceof Class) return Resource.from((Class) obj);
+                return null;
+            }).filter(Objects::nonNull).collect(Collectors.toSet());
+        }
+
+        if (evaluated instanceof ScriptResLoader.IResourceGenerator) {
+            ScriptResLoader.IResourceGenerator resGen = (ScriptResLoader.IResourceGenerator) evaluated;
+            return resGen.apply(null);
+        }
+
+        if (!(se instanceof Invocable)) {
+            return Collections.emptySet();
+        }
+
+        Invocable inv = (Invocable) se;
+        ScriptResLoader.IResourceGenerator resGen = inv.getInterface(ScriptResLoader.IResourceGenerator.class);
+        if (resGen == null) {
+            return Collections.emptySet();
+        }
+        return resGen.apply(null);
+    }
+
+    public FileFilter getFileFilter() {
+        return new OrFileFilter(Arrays.asList(
+            new WildcardFileFilter("*.js")
+//            ,new WildcardFileFilter("*.scala")
+        ));
     }
 
     public void generateAjaxMetadata(Set<Resource> resSet) {
@@ -120,7 +157,7 @@ public class ScriptResLoader extends ResourceConfig {
     private void startWatchScriptFolder(final String startPath) {
         if (!startedWatch.compareAndSet(false, true)) return;
         watchThread.submit(() -> {
-            try (FileMonitor fm = new FileMonitor(startPath, SCRIPT_EXTS)) {
+            try (FileMonitor fm = new FileMonitor(startPath, getFileFilter())) {
                 fm.addObserver(ScriptResLoader.this::onFileChange);
                 fm.run();
             } catch (Exception e) {
@@ -134,9 +171,8 @@ public class ScriptResLoader extends ResourceConfig {
         return Stream.of(StringUtils.split(pathProperty, ",")).map(String::trim).toArray(String[]::new);
     }
 
-    private Set<Resource> executeScriptFile(File file) {
+    protected Set<Resource> executeScriptFile(File file) {
         log.info("loading rest jersey resource from {}", file);
-
         String extStr = FilenameUtils.getExtension(file.getName());
         ScriptEngine se = ScriptUtils.getScriptEngineByMimeType(extStr);
         if (se == null) {
@@ -151,48 +187,11 @@ public class ScriptResLoader extends ResourceConfig {
                 log.error("scriptStr: {} is blank", scriptStr);
                 return Collections.emptySet();
             }
-
-            Object evaluated = se.eval(scriptStr);
-
-            if (evaluated instanceof Resource) {
-                Resource res = (Resource) evaluated;
-                return new HashSet<Resource>(Arrays.asList(res));
-            }
-
-            if (evaluated instanceof Set) {
-                Set set = (Set) evaluated;
-                if (CollectionUtils.isEmpty(set)) {
-                    return Collections.emptySet();
-                }
-
-                return (Set<Resource>) set.stream().filter(Objects::nonNull).map(obj -> {
-                    if (obj instanceof Resource) return (Resource) obj;
-                    if (obj instanceof Class) return Resource.from((Class) obj);
-                    return null;
-                }).filter(Objects::nonNull).collect(Collectors.toSet());
-            }
-
-            if (evaluated instanceof IResourceGenerator) {
-                IResourceGenerator resGen = (IResourceGenerator) evaluated;
-                return resGen.apply(this);
-            }
-
-            if (!(se instanceof Invocable)) {
-                return Collections.emptySet();
-            }
-
-            Invocable inv = (Invocable) se;
-            IResourceGenerator resGen = inv.getInterface(IResourceGenerator.class);
-            if (resGen == null) {
-                log.error("failed to get function to create Resources at {}", file);
-                return Collections.emptySet();
-            }
-            Set<Resource> resourceSet = resGen.apply(this);
-//            scriptPathAndResources.put(file.toPath(), resourceSet);
-            return resourceSet;
+            se.getBindings(ScriptContext.ENGINE_SCOPE).put("current_path", file.getParentFile().getAbsolutePath());
+            return tryEvalForResources(se, scriptStr);
         } catch (IOException e) {
             log.error("fail to execute script file: ", e);
-        } catch (ScriptException e) {
+        } catch (Exception e) {
             log.info(MiscUtils.lineNumber(scriptStr));
             log.error(String.format("failed to execute script: \n\t %s \n\t", MiscUtils.lineNumber(scriptStr)), e);
         }
@@ -200,7 +199,6 @@ public class ScriptResLoader extends ResourceConfig {
     }
 
     private void onFileChange(Observable fm, Object _watchEvents) {
-
         Map<WatchEvent.Kind, Set<Path>> eventAndPaths = FileMonitor.castEvent(_watchEvents);
         Set<Resource> deletedResources = eventAndPaths.get(ENTRY_DELETE).stream()
             .map(scriptPathAndResources::remove)
@@ -247,5 +245,22 @@ public class ScriptResLoader extends ResourceConfig {
 
     public interface IResourceGenerator {
         Set<Resource> apply(Application app);
+    }
+
+    private static class ContainerListener implements ContainerLifecycleListener {
+        @Override
+        public void onStartup(Container container) {
+            log.info("ScriptResLoader.container = {}", container);
+            instance.container = container;
+            instance.container.getConfiguration().getProperties().get(SCRIPT_PATH);
+        }
+
+        @Override
+        public void onReload(Container container) {
+        }
+
+        @Override
+        public void onShutdown(Container container) {
+        }
     }
 }
