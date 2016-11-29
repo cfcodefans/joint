@@ -7,6 +7,8 @@ import org.joints.rest.script.ScriptResLoader.IResourceGenerator
 
 import scala.collection.JavaConverters._
 
+
+
 @Path("/scala")
 class ScalaRes {
 

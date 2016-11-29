@@ -1,11 +1,14 @@
+import jdk.nashorn.api.scripting.NashornScriptEngine;
+import jdk.nashorn.api.scripting.NashornScriptEngineFactory;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.glassfish.jersey.server.model.Resource;
-import org.joints.commons.MiscUtils;
 import org.joints.rest.script.ScriptResLoader;
 import org.junit.Test;
 import scala.reflect.internal.util.ScalaClassLoader;
-import scala.reflect.internal.util.ScalaClassLoader$;
+import scala.tools.nsc.interpreter.IMain;
+import scala.tools.nsc.interpreter.Scripted;
+import scala.tools.nsc.settings.MutableSettings;
 
 import javax.script.*;
 import java.io.File;
@@ -27,9 +30,13 @@ public class ScriptTests {
         se.getContext().setWriter(new PrintWriter(System.out));
 
         String loadResAsString = FileUtils.readFileToString(new File("src/test/resources/rest-tests.scala.code"), Charset.defaultCharset());
-        System.out.println(MiscUtils.lineNumber(loadResAsString));
+//        System.out.println(MiscUtils.lineNumber(loadResAsString));
 
-        ScalaClassLoader.
+        ScriptContext sc = new SimpleScriptContext();
+        sc.setAttribute("CLASS_LOADER", Thread.currentThread().getContextClassLoader(), ScriptContext.GLOBAL_SCOPE);
+        sc.setWriter(new PrintWriter(System.out));
+        se.setContext(sc);
+
         Set<Resource> resourceSet = tryEval(se, loadResAsString);
         System.out.println(resourceSet);
     }
@@ -44,7 +51,7 @@ public class ScriptTests {
         }
 
         if (evaluated instanceof Class) {
-            Class clz = (Class)evaluated;
+            Class clz = (Class) evaluated;
             Resource res = Resource.from(clz);
             return new HashSet<Resource>(Arrays.asList(res));
         }
@@ -83,4 +90,97 @@ public class ScriptTests {
         }
         return resGen.apply(null);
     }
+
+    @Test
+    public void testScalaScript() throws Exception {
+        ScriptEngineManager sem = new ScriptEngineManager();
+        ScriptEngine se = sem.getEngineByExtension("scala");
+
+//        SimpleScriptContext _sc = new SimpleScriptContext();
+//        _sc.getBindings(ScriptContext.ENGINE_SCOPE).put("app", this);
+//        se.setContext(_sc);
+
+        se.put("app", this);
+        se.put("now", this.now);
+
+        se.getContext().setWriter(new PrintWriter(System.out));
+
+        String loadResAsString = FileUtils.readFileToString(new File("src/test/resources/script.scala.code"), Charset.defaultCharset());
+
+//        System.out.println(se.eval(loadResAsString));
+        System.out.println(se.eval("now.toString"));
+    }
+
+    static class ScriptClassLoader extends ClassLoader implements ScalaClassLoader {
+        public ScriptClassLoader(ClassLoader cl) {
+            super(cl);
+        }
+    }
+
+    @Test
+    public void testScalaResWithSpecialClassLoader() throws Exception {
+
+        Thread t = Thread.currentThread();
+        ClassLoader _cl = t.getContextClassLoader();
+
+        try {
+            ScriptClassLoader scl = new ScriptClassLoader(_cl);
+            t.setContextClassLoader(scl);
+
+            ScriptEngineManager sem = new ScriptEngineManager();
+            ScriptEngine se = sem.getEngineByExtension("scala");
+            Scripted sed = (Scripted) se;
+            IMain intp = sed.intp();
+
+            intp.settings().embeddedDefaults(scl);
+            System.out.println(intp.settings().usejavacp());
+
+//            intp.settings().usejavacp().
+//            intp.isettings().allSettings().
+            String loadResAsString = FileUtils.readFileToString(new File("src/test/resources/rest-tests1.scala"), Charset.defaultCharset());
+//        System.out.println(MiscUtils.lineNumber(loadResAsString));
+
+            Set<Resource> resourceSet = tryEval(se, loadResAsString);
+            System.out.println(resourceSet);
+            intp.close();
+        } finally {
+            t.setContextClassLoader(_cl);
+        }
+    }
+
+    public Date now = new Date();
+
+    @Test
+    public void testScalaResUsingJavaClassLoader() throws Exception {
+        ScriptEngineManager sem = new ScriptEngineManager();
+        ScriptEngine se = sem.getEngineByExtension("scala");
+        Scripted sed = (Scripted) se;
+        IMain intp = sed.intp();
+
+        MutableSettings.BooleanSetting usejavacp = (MutableSettings.BooleanSetting) intp.settings().usejavacp();
+        usejavacp.v_$eq(true);
+        System.out.println(usejavacp);
+
+//            intp.settings().usejavacp().
+//            intp.isettings().allSettings().
+        String loadResAsString = FileUtils.readFileToString(new File("src/test/resources/rest-tests.scala.code"), Charset.defaultCharset());
+//        System.out.println(MiscUtils.lineNumber(loadResAsString));
+
+        Set<Resource> resourceSet = tryEval(se, loadResAsString);
+        System.out.println(resourceSet);
+        intp.close();
+    }
+
+    @Test
+    public void testNashorn() throws ScriptException {
+        NashornScriptEngineFactory nsef = new NashornScriptEngineFactory();
+        NashornScriptEngine nse = (NashornScriptEngine) nsef.getScriptEngine("--language=es6");
+
+        nse.getContext().setWriter(new PrintWriter(System.out));
+//        nse.eval("var double = i=>i * 2");
+        nse.put("now", new Date());
+        nse.eval("print(now);");
+    }
+
+
 }
