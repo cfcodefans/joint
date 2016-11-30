@@ -14,10 +14,10 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>joint-commons</module>
-        <module>joint-jersey</module>
+        <module>joints-commons</module>
+        <module>joints-jersey</module>
         <module>joint-rabbitmq</module>
-        <module>tests</module>
+        <module>joints-tests</module>
     </modules>
 
     <dependencies>

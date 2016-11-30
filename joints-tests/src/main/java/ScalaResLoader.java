@@ -53,7 +53,7 @@ public class ScalaResLoader extends ScriptResLoader {
             t.setContextClassLoader(scl);
 
             if (_cl instanceof URLClassLoader) {
-                URLClassLoader ucl = (ScalaClassLoader.URLClassLoader) _cl;
+                URLClassLoader ucl = (URLClassLoader) _cl;
                 List<URL> clzPathList = Arrays.asList(ucl.getURLs()).stream()
                     .filter((URL url) -> {
                         try {
