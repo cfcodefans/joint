@@ -137,7 +137,7 @@ public class ScriptTests {
 
 //            intp.settings().usejavacp().
 //            intp.isettings().allSettings().
-            String loadResAsString = FileUtils.readFileToString(new File("src/test/resources/rest-tests1.scala"), Charset.defaultCharset());
+            String loadResAsString = FileUtils.readFileToString(new File("src/test/resources/rest-tests.scala"), Charset.defaultCharset());
 //        System.out.println(MiscUtils.lineNumber(loadResAsString));
 
             Set<Resource> resourceSet = tryEval(se, loadResAsString);

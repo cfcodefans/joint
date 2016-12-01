@@ -1,6 +1,7 @@
 import javax.ws.rs.core.MediaType._
 import javax.ws.rs.{GET, Path, Produces}
 
+import org.glassfish.jersey.server.model.Resource
 
 
 @Path("/scala")
@@ -14,7 +15,7 @@ class ScalaRes {
     }
 }
 
-classOf[ScalaRes]
+Resource.from(classOf[ScalaRes])
 
 // /class ResGen extends IResourceGenerator {
 //    def apply(app: Application): java.util.Set[Resource] = {
