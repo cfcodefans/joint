@@ -8,6 +8,7 @@ import org.apache.commons.io.filefilter.WildcardFileFilter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.ThreadContext;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.message.DeflateEncoder;
 import org.glassfish.jersey.message.GZipEncoder;
@@ -173,18 +174,21 @@ public class ScriptResLoader extends ResourceConfig {
 
     protected Set<Resource> executeScriptFile(File file) {
         log.info("loading rest jersey resource from {}", file);
-        String extStr = FilenameUtils.getExtension(file.getName());
-        ScriptEngine se = ScriptUtils.getScriptEngineByMimeType(extStr);
-        if (se == null) {
-            log.error("invalid script file extension: {}", file);
-            return Collections.emptySet();
-        }
+
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
 
         String scriptStr = null;
         try {
             scriptStr = FileUtils.readFileToString(file, Charset.defaultCharset());
             if (StringUtils.isBlank(scriptStr)) {
                 log.error("scriptStr: {} is blank", scriptStr);
+                return Collections.emptySet();
+            }
+
+            String extStr = FilenameUtils.getExtension(file.getName());
+            ScriptEngine se = ScriptUtils.getScriptEngineByMimeType(extStr);
+            if (se == null) {
+                log.error("invalid script file extension: {}", file);
                 return Collections.emptySet();
             }
             se.getBindings(ScriptContext.ENGINE_SCOPE).put("current_path", file.getParentFile().getAbsolutePath());
@@ -194,6 +198,8 @@ public class ScriptResLoader extends ResourceConfig {
         } catch (Exception e) {
             log.info(MiscUtils.lineNumber(scriptStr));
             log.error(String.format("failed to execute script: \n\t %s \n\t", MiscUtils.lineNumber(scriptStr)), e);
+        } finally {
+            Thread.currentThread().setContextClassLoader(cl);
         }
         return Collections.emptySet();
     }
