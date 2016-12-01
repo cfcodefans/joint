@@ -8,7 +8,6 @@ import org.apache.commons.io.filefilter.WildcardFileFilter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.ThreadContext;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.message.DeflateEncoder;
 import org.glassfish.jersey.message.GZipEncoder;
@@ -24,10 +23,7 @@ import org.joints.commons.ScriptUtils;
 import org.joints.rest.ajax.AjaxResContext;
 import org.joints.web.mvc.ResCacheMgr;
 
-import javax.script.Invocable;
-import javax.script.ScriptContext;
-import javax.script.ScriptEngine;
-import javax.script.ScriptException;
+import javax.script.*;
 import javax.ws.rs.core.Application;
 import java.io.File;
 import java.io.FileFilter;
@@ -92,15 +88,22 @@ public class ScriptResLoader extends ResourceConfig {
         startWatchScriptFolder(realResPath);
     }
 
-    protected Set<Resource> tryEvalForResources(ScriptEngine se, String scriptStr) throws ScriptException {
+    protected Object tryEvalForResources(ScriptEngine se, String scriptStr) throws ScriptException {
         Object evaluated = null;
-//        if (se instanceof Compilable) {
-//            Compilable cpl = (Compilable) se;
-//            evaluated = cpl.compile(scriptStr).eval();
-//        } else {
+        if (se instanceof Compilable) {
+            Compilable cpl = (Compilable) se;
+            evaluated = cpl.compile(scriptStr).eval();
+        } else if(se instanceof Invocable) {
+            Invocable inv = (Invocable) se;
+            evaluated = inv.getInterface(ScriptResLoader.IResourceGenerator.class);
+        } else {
             evaluated = se.eval(scriptStr);
-//        }
+        }
 
+        return evaluated;
+    }
+
+    protected Set<Resource> castToResouces(Object evaluated) {
         if (evaluated instanceof Class) {
             Class clz = (Class) evaluated;
             Resource res = Resource.from(clz);
@@ -125,21 +128,11 @@ public class ScriptResLoader extends ResourceConfig {
             }).filter(Objects::nonNull).collect(Collectors.toSet());
         }
 
-        if (evaluated instanceof ScriptResLoader.IResourceGenerator) {
-            ScriptResLoader.IResourceGenerator resGen = (ScriptResLoader.IResourceGenerator) evaluated;
+        if (evaluated instanceof IResourceGenerator) {
+            IResourceGenerator resGen = (IResourceGenerator) evaluated;
             return resGen.apply(null);
         }
-
-        if (!(se instanceof Invocable)) {
-            return Collections.emptySet();
-        }
-
-        Invocable inv = (Invocable) se;
-        ScriptResLoader.IResourceGenerator resGen = inv.getInterface(ScriptResLoader.IResourceGenerator.class);
-        if (resGen == null) {
-            return Collections.emptySet();
-        }
-        return resGen.apply(null);
+        return Collections.emptySet();
     }
 
     public FileFilter getFileFilter() {
@@ -192,7 +185,7 @@ public class ScriptResLoader extends ResourceConfig {
                 return Collections.emptySet();
             }
             se.getBindings(ScriptContext.ENGINE_SCOPE).put("current_path", file.getParentFile().getAbsolutePath());
-            return tryEvalForResources(se, scriptStr);
+            return castToResouces(tryEvalForResources(se, scriptStr));
         } catch (IOException e) {
             log.error("fail to execute script file: ", e);
         } catch (Exception e) {

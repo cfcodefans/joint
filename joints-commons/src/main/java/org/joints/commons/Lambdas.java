@@ -143,6 +143,36 @@ public class Lambdas {
         }
     }
 
+    public interface ExPredicate<T> {
+        boolean test(T t) throws Exception;
+
+        default boolean defaultValue() {
+            return false;
+        }
+    }
+
+    public static class ExPredicateWrapper<T> implements Predicate<T> {
+        public final ExPredicate<T> pred;
+        public final boolean defaultResult;
+        public final Consumer<Exception> exceptionHandler;
+
+        public ExPredicateWrapper(ExPredicate<T> ep, Consumer<Exception> _exceptionHandler, boolean _default) {
+            this.pred = ep;
+            this.defaultResult = _default;
+            this.exceptionHandler = _exceptionHandler;
+        }
+
+        @Override
+        public boolean test(T t) {
+            try {
+                return pred.test(t);
+            } catch (Exception e) {
+                exceptionHandler.accept(e);
+            }
+            return defaultResult;
+        }
+    }
+
     public interface IExVarArgConsumer<T> {
         @SuppressWarnings("unchecked")
         void accept(T... args) throws Exception;
@@ -289,5 +319,17 @@ public class Lambdas {
 
     public static <T> T defaultValue() {
         return null;
+    }
+
+    public static <T> Predicate<T> wp(ExPredicate<T> p, Consumer<Exception> exceptionHandler, boolean _default) {
+        return new ExPredicateWrapper<T>(p, exceptionHandler, _default);
+    }
+
+    public static <T> Predicate<T> wp(ExPredicate<T> p, boolean _default) {
+        return new ExPredicateWrapper<T>(p, Lambdas::defaultExceptionConsumer, _default);
+    }
+
+    public static <T> Predicate<T> wpf(ExPredicate<T> p) {
+        return new ExPredicateWrapper<T>(p, Lambdas::defaultExceptionConsumer, false);
     }
 }

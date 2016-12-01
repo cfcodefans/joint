@@ -1,8 +1,6 @@
 import javax.ws.rs.core.MediaType._
 import javax.ws.rs.{GET, Path, Produces}
 
-
-
 @Path("/scala")
 class ScalaRes {
 
