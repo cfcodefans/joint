@@ -11,11 +11,16 @@ import org.apache.logging.log4j.Logger;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.message.DeflateEncoder;
 import org.glassfish.jersey.message.GZipEncoder;
+import org.glassfish.jersey.process.Inflector;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.filter.EncodingFilter;
 import org.glassfish.jersey.server.model.Resource;
+import org.glassfish.jersey.server.monitoring.ApplicationEvent;
+import org.glassfish.jersey.server.monitoring.ApplicationEventListener;
+import org.glassfish.jersey.server.monitoring.RequestEvent;
+import org.glassfish.jersey.server.monitoring.RequestEventListener;
+import org.glassfish.jersey.server.spi.AbstractContainerLifecycleListener;
 import org.glassfish.jersey.server.spi.Container;
-import org.glassfish.jersey.server.spi.ContainerLifecycleListener;
 import org.joints.commons.FileMonitor;
 import org.joints.commons.MiscUtils;
 import org.joints.commons.ProcTrace;
@@ -24,7 +29,9 @@ import org.joints.rest.ajax.AjaxResContext;
 import org.joints.web.mvc.ResCacheMgr;
 
 import javax.script.*;
+import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.Response;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -93,17 +100,21 @@ public class ScriptResLoader extends ResourceConfig {
         if (se instanceof Compilable) {
             Compilable cpl = (Compilable) se;
             evaluated = cpl.compile(scriptStr).eval();
-        } else if(se instanceof Invocable) {
-            Invocable inv = (Invocable) se;
-            evaluated = inv.getInterface(ScriptResLoader.IResourceGenerator.class);
-        } else {
-            evaluated = se.eval(scriptStr);
+            if (evaluated != null)
+                return evaluated;
         }
 
+        if (se instanceof Invocable) {
+            Invocable inv = (Invocable) se;
+            evaluated = inv.getInterface(ScriptResLoader.IResourceGenerator.class);
+            if (evaluated != null)
+                return evaluated;
+        }
+        evaluated = se.eval(scriptStr);
         return evaluated;
     }
 
-    protected Set<Resource> castToResouces(Object evaluated) {
+    protected Set<Resource> castToResources(Object evaluated) {
         if (evaluated instanceof Class) {
             Class clz = (Class) evaluated;
             Resource res = Resource.from(clz);
@@ -185,7 +196,7 @@ public class ScriptResLoader extends ResourceConfig {
                 return Collections.emptySet();
             }
             se.getBindings(ScriptContext.ENGINE_SCOPE).put("current_path", file.getParentFile().getAbsolutePath());
-            return castToResouces(tryEvalForResources(se, scriptStr));
+            return castToResources(tryEvalForResources(se, scriptStr));
         } catch (IOException e) {
             log.error("fail to execute script file: ", e);
         } catch (Exception e) {
@@ -199,37 +210,30 @@ public class ScriptResLoader extends ResourceConfig {
 
     private void onFileChange(Observable fm, Object _watchEvents) {
         Map<WatchEvent.Kind, Set<Path>> eventAndPaths = FileMonitor.castEvent(_watchEvents);
-        Set<Resource> deletedResources = eventAndPaths.get(ENTRY_DELETE).stream()
+        eventAndPaths.get(ENTRY_DELETE).stream()
             .map(scriptPathAndResources::remove)
             .flatMap(Set::stream).collect(Collectors.toSet());
 
-        eventAndPaths.get(ENTRY_CREATE).stream()
-            .forEach(path -> {
-                Set<Resource> newResources = executeScriptFile(path.toFile());
-                if (CollectionUtils.isNotEmpty(newResources))
-                    scriptPathAndResources.put(path, newResources);
-                else
-                    scriptPathAndResources.remove(path);
-            });
+        Set<Path> createdPaths = eventAndPaths.get(ENTRY_CREATE);
+        Set<Path> modifiedPaths = eventAndPaths.get(ENTRY_MODIFY);
+        modifiedPaths.addAll(createdPaths);
 
-        eventAndPaths.get(ENTRY_MODIFY).stream()
-            .forEach(path -> {
-                Set<Resource> newResources = executeScriptFile(path.toFile());
-                if (CollectionUtils.isNotEmpty(newResources))
-                    scriptPathAndResources.put(path, newResources);
-                else
-                    scriptPathAndResources.remove(path);
-            });
+        for (Path path : modifiedPaths) {
+            Set<Resource> newResources = executeScriptFile(path.toFile());
+            if (CollectionUtils.isNotEmpty(newResources))
+                scriptPathAndResources.put(path, newResources);
+            else
+                scriptPathAndResources.remove(path);
+        }
 
         Set<Resource> resSet = scriptPathAndResources.values().stream().flatMap(Set::stream).collect(Collectors.toSet());
         this.resHolder = new ResourceConfig();
-
         prepareResourceConfig(resSet, resHolder);
 
         container.reload(resHolder);
     }
 
-    private void prepareResourceConfig(Set<Resource> resSet, ResourceConfig resourceConfig) {
+    protected void prepareResourceConfig(Set<Resource> resSet, ResourceConfig resourceConfig) {
         resourceConfig.register(JacksonFeature.class);
         resourceConfig.register(EncodingFilter.class);
         resourceConfig.register(GZipEncoder.class);
@@ -246,7 +250,7 @@ public class ScriptResLoader extends ResourceConfig {
         Set<Resource> apply(Application app);
     }
 
-    private static class ContainerListener implements ContainerLifecycleListener {
+    private static class ContainerListener extends AbstractContainerLifecycleListener {
         @Override
         public void onStartup(Container container) {
             log.info("ScriptResLoader.container = {}", container);
@@ -260,6 +264,24 @@ public class ScriptResLoader extends ResourceConfig {
 
         @Override
         public void onShutdown(Container container) {
+        }
+    }
+
+    private static class AppHandlerListener implements ApplicationEventListener {
+        @Override
+        public void onEvent(ApplicationEvent event) {
+        }
+
+        @Override
+        public RequestEventListener onRequest(RequestEvent requestEvent) {
+            return null;
+        }
+    }
+
+    private static class ResDelegator implements Inflector<ContainerRequestContext, Response> {
+        @Override
+        public Response apply(ContainerRequestContext containerRequestContext) {
+            return null;
         }
     }
 }

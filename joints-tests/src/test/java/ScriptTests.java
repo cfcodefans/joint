@@ -4,8 +4,13 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.glassfish.jersey.server.model.Resource;
 import org.joints.rest.script.ScriptResLoader;
+import org.junit.Assert;
 import org.junit.Test;
+import scala.collection.JavaConverters;
+import scala.reflect.internal.util.BatchSourceFile;
 import scala.reflect.internal.util.ScalaClassLoader;
+import scala.reflect.io.VirtualFile;
+import scala.tools.nsc.Global;
 import scala.tools.nsc.interpreter.IMain;
 import scala.tools.nsc.interpreter.Scripted;
 import scala.tools.nsc.settings.MutableSettings;
@@ -16,8 +21,6 @@ import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.stream.Collectors;
-
-;
 
 /**
  * Created by fan on 2016/11/28.
@@ -182,5 +185,24 @@ public class ScriptTests {
         nse.eval("print(now);");
     }
 
+    @Test
+    public void testCompiler() throws Exception {
+        ScriptEngineManager sem = new ScriptEngineManager();
+        ScriptEngine se = sem.getEngineByExtension("scala");
+        Scripted sed = (Scripted) se;
+        IMain iMain = new IMain(sed.intp().settings(), new PrintWriter(System.out)); //((Scripted) se).intp();
+        String loadResAsString = FileUtils.readFileToString(new File("src/test/resources/ScalaRes.scala"), Charset.defaultCharset());
 
+        Global.Run run = iMain.compileSourcesKeepingRun(
+            JavaConverters.asScalaBuffer(Arrays.asList(new BatchSourceFile(new VirtualFile("src/main/webapp/WEB-INF/scripts/ScalaRes.scala", "./"), loadResAsString.toCharArray())))
+        )._2();
+        Assert.assertNotNull(run);
+
+        Class<?> scalaRes = iMain.classLoader().findClass("ScalaRes");
+        Assert.assertNotNull(scalaRes);
+
+        System.out.println(iMain.classLoader().classNameToPath("ScalaRes"));
+
+        Assert.assertNotNull(Class.forName("ScalaRes"));
+    }
 }

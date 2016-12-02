@@ -4,61 +4,63 @@
          xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd">
 
     <display-name>joint-tests</display-name>
-        <servlet>
-            <servlet-name>ScriptResLoader</servlet-name>
-            <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
-            <init-param>
-                <param-name>javax.ws.rs.Application</param-name>
-                <param-value>ScalaResLoader</param-value>
-            </init-param>
-            <init-param>
-                <param-name>script-path</param-name>
-                <param-value>WEB-INF/scripts</param-value>
-            </init-param>
-            <init-param>
-                <param-name>jersey.config.server.application.name</param-name>
-                <param-value>rest-script</param-value>
-            </init-param>
-            <init-param>
-                <param-name>jersey.config.server.provider.classnames</param-name>
-                <param-value>org.glassfish.jersey.ext.cdi1x.internal.CdiComponentProvider</param-value>
-            </init-param>
-            <load-on-startup>3</load-on-startup>
-            <async-supported>true</async-supported>
-        </servlet>
-        <servlet-mapping>
-            <servlet-name>ScriptResLoader</servlet-name>
-            <url-pattern>/rest/scripts/v1/*</url-pattern>
-        </servlet-mapping>
+    <servlet>
+        <servlet-name>ScriptResLoader</servlet-name>
+        <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
+        <init-param>
+            <param-name>javax.ws.rs.Application</param-name>
+            <param-value>ScalaResCompiler</param-value>
+        </init-param>
+        <init-param>
+            <param-name>script-path</param-name>
+            <param-value>WEB-INF/scripts</param-value>
+        </init-param>
+        <init-param>
+            <param-name>jersey.config.server.application.name</param-name>
+            <param-value>rest-script</param-value>
+        </init-param>
+        <init-param>
+            <param-name>jersey.config.server.provider.classnames</param-name>
+            <param-value>org.glassfish.jersey.ext.cdi1x.internal.CdiComponentProvider</param-value>
+        </init-param>
+        <load-on-startup>3</load-on-startup>
+        <async-supported>true</async-supported>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ScriptResLoader</servlet-name>
+        <url-pattern>/rest/scripts/v1/*</url-pattern>
+    </servlet-mapping>
 
-            <servlet>
-                <servlet-name>ResLoader</servlet-name>
-                <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
-                <init-param>
-                    <param-name>javax.ws.rs.Application</param-name>
-                    <param-value>org.joints.rest.ajax.AjaxResLoader</param-value>
-                </init-param>
-                <init-param>
-                    <param-name>jersey.config.server.application.name</param-name>
-                    <param-value>rest-ajax</param-value>
-                </init-param>
-                <init-param>
-                    <param-name>jersey.config.server.provider.packages</param-name>
-                    <param-value>
-                        org.joints.rest.ajax
-                    </param-value>
-                </init-param>
-                <init-param>
-                    <param-name>jersey.config.server.provider.classnames</param-name>
-                    <param-value>org.glassfish.jersey.ext.cdi1x.internal.CdiComponentProvider</param-value>
-                </init-param>
-                <load-on-startup>2</load-on-startup>
-                <async-supported>true</async-supported>
-            </servlet>
-            <servlet-mapping>
-                <servlet-name>ResLoader</servlet-name>
-                <url-pattern>/rest/v1/*</url-pattern>
-            </servlet-mapping>
+    <servlet>
+        <servlet-name>ResLoader</servlet-name>
+        <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
+        <init-param>
+            <param-name>javax.ws.rs.Application</param-name>
+            <param-value>org.joints.rest.ajax.AjaxResLoader</param-value>
+        </init-param>
+        <init-param>
+            <param-name>jersey.config.server.application.name</param-name>
+            <param-value>rest-ajax</param-value>
+        </init-param>
+        <init-param>
+            <param-name>jersey.config.server.provider.packages</param-name>
+            <param-value>
+                org.joints.rest.ajax
+            </param-value>
+        </init-param>
+        <init-param>
+            <param-name>jersey.config.server.provider.classnames</param-name>
+            <param-value>org.glassfish.jersey.ext.cdi1x.internal.CdiComponentProvider</param-value>
+        </init-param>
+        <load-on-startup>2</load-on-startup>
+        <async-supported>true</async-supported>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ResLoader</servlet-name>
+        <url-pattern>/rest/v1/*</url-pattern>
+    </servlet-mapping>
+
+    <!--
             <servlet>
                 <servlet-name>JerseyController</servlet-name>
                 <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
@@ -86,7 +88,7 @@
                 <servlet-name>JerseyController</servlet-name>
                 <url-pattern>/mvc/*</url-pattern>
             </servlet-mapping>
-
+-->
     <servlet>
         <servlet-name>hide</servlet-name>
         <servlet-class>org.eclipse.jetty.servlet.DefaultServlet</servlet-class>
