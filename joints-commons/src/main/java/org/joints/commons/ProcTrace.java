@@ -8,42 +8,16 @@ import java.util.Stack;
 
 public class ProcTrace {
     private static final String INDENT = "    ";
-    private StringBuilder buf = new StringBuilder();
+    private static final ThreadLocal<ProcTrace> instancePool = ThreadLocal.withInitial(ProcTrace::new);
     private final Stack<TraceEntry> stack = new Stack<TraceEntry>();
-
-    public static class TraceStep {
-        long perfTime;
-        String stepInfo;
-
-        public String toString() {
-            return perfTime + " ms:\t" + stepInfo;
-        }
-    }
-
-    public static class TraceSubStep extends TraceStep {
-        public String toString() {
-            return stepInfo;
-        }
-    }
-
-    public static class TraceEntry {
-        final long startTime = System.currentTimeMillis();
-        long currentTime;
-        final LinkedList<TraceStep> steps = new LinkedList<TraceStep>();
-    }
-
-    private static final ThreadLocal<ProcTrace> instancePool = new ThreadLocal<ProcTrace>() {
-        protected ProcTrace initialValue() {
-            return new ProcTrace();
-        }
-    };
-
-    public static ProcTrace instance() {
-        return instancePool.get();
-    }
+    private StringBuilder buf = new StringBuilder();
 
     private ProcTrace() {
 
+    }
+
+    public static ProcTrace instance() {
+        return instancePool.get();
     }
 
     public static TraceEntry start() {
@@ -57,12 +31,11 @@ public class ProcTrace {
         te.currentTime = te.startTime;
 
         TraceStep ts = new TraceStep();
-        ts.perfTime = 0;
+        ts.performTime = 0;
         ts.stepInfo = logMsg;
         te.steps.push(ts);
 
         pt.stack.push(te);
-
         return te;
     }
 
@@ -81,11 +54,7 @@ public class ProcTrace {
         }
 
         final TraceEntry te = pt.stack.peek();
-        final TraceStep lastStep = te.steps.peekLast();
-        final long curTime = System.currentTimeMillis();
-        lastStep.perfTime = curTime - te.currentTime;
-        te.currentTime = curTime;
-        te.steps.add(ts);
+        te.ongoing(ts);
     }
 
     public static void end() {
@@ -101,10 +70,8 @@ public class ProcTrace {
 
         final TraceEntry te = pt.stack.pop();
 
-        final StringBuilder sb = new StringBuilder();
-        sb.append("\n").append(prefix).append(System.currentTimeMillis() - te.startTime).append(" ms:\t").append(te.steps.poll().stepInfo);
-        te.steps.stream().forEach((ts) -> sb.append('\n').append(prefix).append(INDENT).append(ts.toString()));
-        sb.append('\n');
+        long now = System.currentTimeMillis();
+        String sb = te.end(prefix, now);
 
         if (pt.stack.isEmpty()) {
             pt.buf.append(sb);
@@ -123,10 +90,28 @@ public class ProcTrace {
 
 //		final int layer = pt.stack.indexOf(te);
 //		pt.finishedStack.push(new StringBuilder("\n" + StringUtils.repeat(INDENT, layer + 1) + "Exception: " + logMsg));
-        for (TraceEntry _te = pt.stack.peek(); _te != te; _te = pt.stack.peek()) {
-            end();
+//        for (TraceEntry _te = pt.stack.peek();
+//             _te != te && !pt.stack.isEmpty();
+//             _te = pt.stack.peek()) {
+//            end();
+//        }
+
+        long now = System.currentTimeMillis();
+        for (int j = pt.stack.size(), i = j - 1; i >= 0; i--) {
+            if (pt.stack.peek() == te) break;
+
+            final String prefix = StringUtils.repeat(INDENT, pt.stack.size());
+            TraceEntry _te = pt.stack.pop();
+            String ended = _te.end(prefix, now);
+
+            TraceStep ts = new TraceSubStep();
+            ts.stepInfo = ended.toString();
+            TraceEntry __te = pt.stack.peek();
+            __te.ongoing(ts);
         }
+
         ProcTrace.ongoing("Exception: " + logMsg);
+        ProcTrace.end();
     }
 
     public static void end(final TraceEntry te, final Throwable e) {
@@ -142,5 +127,73 @@ public class ProcTrace {
         pt.stack.clear();
         pt.buf = new StringBuilder("\n");
         return str;
+    }
+
+    public static String endAndFlush() {
+        ProcTrace pt = ProcTrace.instance();
+
+        long now = System.currentTimeMillis();
+        for (int j = pt.stack.size(), i = j - 1; i > 0; i--) {
+            final String prefix = StringUtils.repeat(INDENT, pt.stack.size());
+            TraceEntry _te = pt.stack.pop();
+            String ended = _te.end(prefix, now);
+
+            TraceStep ts = new TraceSubStep();
+            ts.stepInfo = ended.toString().trim();
+            TraceEntry __te = pt.stack.peek();
+            __te.ongoing(ts);
+        }
+
+        end();
+        return flush();
+    }
+
+    public static class TraceStep {
+        long performTime;
+        String stepInfo;
+
+        public String toString() {
+            return performTime + " ms:\t" + stepInfo;
+        }
+    }
+
+    public static class TraceSubStep extends TraceStep {
+        public String toString() {
+            return stepInfo;
+        }
+    }
+
+    public static class TraceEntry {
+        final long startTime = System.currentTimeMillis();
+        final LinkedList<TraceStep> steps = new LinkedList<TraceStep>();
+        long currentTime;
+
+        String end(String prefix, long now) {
+            final StringBuilder sb = new StringBuilder();
+//            sb.append("\n").append(prefix).append(String.format("%d ms [%s - %s]",
+//                (now - startTime),
+//                DateFormatUtils.format(startTime, "yyyy-MM-dd hh:mm:ss.sss"),
+//                DateFormatUtils.format(now, "yyyy-MM-dd hh:mm:ss.sss")));
+//            sb.append("\n").append(prefix).append(steps.poll().stepInfo);
+
+            sb.append("\n").append(prefix).append(System.currentTimeMillis() - startTime).append(" ms:\t").append(steps.poll().stepInfo);
+            steps.stream().forEach((ts) -> sb.append('\n').append(prefix).append(INDENT).append(ts.toString()));
+            long lastPerformTime = now - currentTime;
+            if (lastPerformTime > 0)
+                sb.append('\n').append(prefix).append(INDENT).append(String.format("%d end", lastPerformTime));
+            sb.append('\n');
+
+            return sb.toString();
+        }
+
+        TraceStep ongoing(final TraceStep ts) {
+            TraceEntry te = this;
+            final long curTime = System.currentTimeMillis();
+            ts.performTime = curTime - te.currentTime;
+            te.currentTime = curTime;
+            te.steps.add(ts);
+            return ts;
+        }
+
     }
 }
