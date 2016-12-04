@@ -1,5 +1,5 @@
 import javax.ws.rs.core.MediaType._
-import javax.ws.rs.{GET, Path, Produces}
+import javax.ws.rs._
 
 @Path("/scala")
 class ScalaRes {
@@ -19,9 +19,9 @@ class ScalaRes {
 
     @GET
     @Produces(Array(TEXT_PLAIN))
-    @Path("do")
-    def doSomething(): String = {
-        return "I am working on my job!!!" + new java.util.Date();
+    @Path("do/{something}")
+    def doSomething(@PathParam("something") something: String): String = {
+        return s"start $something " + new java.util.Date();
     }
 
    @GET
