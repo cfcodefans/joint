@@ -45,7 +45,7 @@
         <init-param>
             <param-name>jersey.config.server.provider.packages</param-name>
             <param-value>
-                org.joints.rest.ajax
+                org.joints.rest.ajax,tests
             </param-value>
         </init-param>
         <init-param>

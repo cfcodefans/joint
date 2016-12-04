@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>For Tests</title>
+</head>
+<body>
+<script src="../js/jquery-2.1.1.js"></script>
+<script src="../js/rest.js" ></script>
+<script type="text/javascript">
+    console.info(RS.ctx.TestsRes.getAdd //mapped to TestsRes.getAdd
+        .with_a(1) // mapped to parameter a
+        .with_b(2) // mapped to parameter b
+        .call());  // above metadata is wrapped with jquery ajax call
+</script>
+</body>
+</html>
