@@ -10,8 +10,14 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>joint-rabbitmq</artifactId>
+    <packaging>war</packaging>
 
     <dependencies>
+        <dependency>
+            <groupId>org.joints</groupId>
+            <artifactId>joint-jersey</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
         <dependency>
             <groupId>com.rabbitmq</groupId>
             <artifactId>amqp-client</artifactId>
@@ -23,4 +29,14 @@
             <version>2.7</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-maven-plugin</artifactId>
+                <version>9.4.0.RC1</version>
+            </plugin>
+        </plugins>
+    </build>
 </project>
