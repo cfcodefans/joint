@@ -21,7 +21,10 @@ import scala.tools.nsc.interpreter.IMain;
 import scala.tools.nsc.interpreter.Scripted;
 
 import javax.script.ScriptEngine;
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.Charset;

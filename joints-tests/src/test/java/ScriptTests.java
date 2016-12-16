@@ -197,7 +197,6 @@ public class ScriptTests {
             JavaConverters.asScalaBuffer(Arrays.asList(new BatchSourceFile(new VirtualFile("src/main/webapp/WEB-INF/scripts/ScalaRes.scala", "./"), loadResAsString.toCharArray())))
         )._2();
         Assert.assertNotNull(run);
-
         Class<?> scalaRes = iMain.classLoader().findClass("ScalaRes");
         Assert.assertNotNull(scalaRes);
 
