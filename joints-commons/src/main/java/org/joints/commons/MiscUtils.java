@@ -39,12 +39,12 @@ import java.util.concurrent.atomic.AtomicLong;
 public class MiscUtils {
 	public static final int AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();
 
-	public static long getPropertyNumber(String name, long defaultValule) {
+	public static long getPropertyNumber(String name, long defaultValue) {
 		String str = System.getProperty(name);
 		if (StringUtils.isNumeric(str)) {
 			return Long.parseLong(str);
 		}
-		return defaultValule;
+		return defaultValue;
 	}
 
 	public static String invocationInfo() {
