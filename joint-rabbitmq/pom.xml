@@ -42,11 +42,7 @@
             <artifactId>datanucleus-accessplatform-jdo-json</artifactId>
             <version>${jdo-ver}</version>
         </dependency>
-        <dependency>
-            <groupId>org.datanucleus</groupId>
-            <artifactId>datanucleus-scala</artifactId>
-            <version>5.0.0</version>
-        </dependency>
+
     </dependencies>
 
     <build>
