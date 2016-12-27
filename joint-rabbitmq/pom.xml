@@ -39,10 +39,14 @@
 
         <dependency>
             <groupId>org.datanucleus</groupId>
-            <artifactId>datanucleus-accessplatform-jdo-json</artifactId>
+            <artifactId>datanucleus-accessplatform-jpa-rdbms</artifactId>
             <version>${jdo-ver}</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.hsqldb</groupId>
+            <artifactId>hsqldb</artifactId>
+            <version>2.3.4</version>
+        </dependency>
     </dependencies>
 
     <build>
