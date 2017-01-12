@@ -55,7 +55,7 @@ public class AjaxResMethodMetaData implements Serializable {
 			aResMd.returnType = aResMd.returnType.getComponentType();
 		} else if (Collection.class.isAssignableFrom(aResMd.returnType)) {
 			aResMd.isArray = true;
-			aResMd.returnType = Object.class;
+			aResMd.returnType = resMd.getInvocable().getDefinitionMethod().getGenericReturnType().
 		}
 
 		aResMd.jaxrsType = resMd.getType();
