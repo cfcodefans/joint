@@ -5,13 +5,12 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.InputStream;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -111,6 +110,11 @@ public final class Jsons {
 
         SerializationConfig cfg = MAPPER.getSerializationConfig();
         JavaType jt = cfg.constructType(cls);
+        BeanDescription bd = cfg.introspect(jt);
+        List<BeanPropertyDefinition> propList = bd.findProperties();
+
+        List<Class> tmpClsList = new LinkedList<>();
+
 
 
         return null;

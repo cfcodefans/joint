@@ -9,7 +9,7 @@ import java.util.Stack;
 public class ProcTrace {
     private static final String INDENT = "    ";
     private static final ThreadLocal<ProcTrace> instancePool = ThreadLocal.withInitial(ProcTrace::new);
-    private final Stack<TraceEntry> stack = new Stack<TraceEntry>();
+    private final Stack<TraceEntry> stack = new Stack<>();
     private StringBuilder buf = new StringBuilder();
 
     private ProcTrace() {
@@ -77,7 +77,7 @@ public class ProcTrace {
             pt.buf.append(sb);
         } else {
             TraceStep ts = new TraceSubStep();
-            ts.stepInfo = sb.toString();
+            ts.stepInfo = sb;
             ongoing(ts);
         }
     }
@@ -105,7 +105,7 @@ public class ProcTrace {
             String ended = _te.end(prefix, now);
 
             TraceStep ts = new TraceSubStep();
-            ts.stepInfo = ended.toString();
+            ts.stepInfo = ended;
             TraceEntry __te = pt.stack.peek();
             __te.ongoing(ts);
         }
@@ -139,7 +139,7 @@ public class ProcTrace {
             String ended = _te.end(prefix, now);
 
             TraceStep ts = new TraceSubStep();
-            ts.stepInfo = ended.toString().trim();
+            ts.stepInfo = ended.trim();
             TraceEntry __te = pt.stack.peek();
             __te.ongoing(ts);
         }
@@ -165,7 +165,7 @@ public class ProcTrace {
 
     public static class TraceEntry {
         final long startTime = System.currentTimeMillis();
-        final LinkedList<TraceStep> steps = new LinkedList<TraceStep>();
+        final LinkedList<TraceStep> steps = new LinkedList<>();
         long currentTime;
 
         String end(String prefix, long now) {
@@ -177,7 +177,7 @@ public class ProcTrace {
 //            sb.append("\n").append(prefix).append(steps.poll().stepInfo);
 
             sb.append("\n").append(prefix).append(System.currentTimeMillis() - startTime).append(" ms:\t").append(steps.poll().stepInfo);
-            steps.stream().forEach((ts) -> sb.append('\n').append(prefix).append(INDENT).append(ts.toString()));
+            steps.forEach((ts) -> sb.append('\n').append(prefix).append(INDENT).append(ts.toString()));
             long lastPerformTime = now - currentTime;
             if (lastPerformTime > 0)
                 sb.append('\n').append(prefix).append(INDENT).append(String.format("%d end", lastPerformTime));
