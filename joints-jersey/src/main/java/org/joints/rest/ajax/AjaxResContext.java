@@ -37,9 +37,9 @@ public class AjaxResContext {
         return cache.computeIfAbsent(StringUtils.defaultIfBlank(name, ""), (n) -> new AjaxResContext());
     }
 
-    List<AjaxResMetaData> proxyList = new ArrayList<AjaxResMetaData>();
+    List<AjaxResMetadata> proxyList = new ArrayList<AjaxResMetadata>();
 
-    public List<AjaxResMetaData> getProxyList() {
+    public List<AjaxResMetadata> getProxyList() {
         return proxyList;
     }
 
@@ -51,13 +51,13 @@ public class AjaxResContext {
         if (CollectionUtils.isEmpty(resources)) {
             return;
         }
-        List<AjaxResMetaData> resMetaDataList = getAjaxResMetaDatas(_app, resources);
+        List<AjaxResMetadata> resMetaDataList = getAjaxResMetaDatas(_app, resources);
         proxyList.addAll(resMetaDataList);
     }
 
     public void build(final Collection<Resource> resources) {
         proxyList.addAll(resources.parallelStream().map(res -> {
-            AjaxResMetaData resMd = AjaxResMetaData.build(res);
+            AjaxResMetadata resMd = AjaxResMetadata.build(res);
             Collection<Class<?>> _clss = res.getHandlerClasses();
 
             _clss.stream().filter(_cls -> !isSingleton(_cls)).forEach(_cls -> {
@@ -71,13 +71,13 @@ public class AjaxResContext {
         }).collect(Collectors.toList()));
     }
 
-    public static List<AjaxResMetaData> getAjaxResMetaDatas(Application _app, Collection<Resource> resources) {
+    public static List<AjaxResMetadata> getAjaxResMetaDatas(Application _app, Collection<Resource> resources) {
         Set<Class<?>> resClass = _app.getClasses();
         log.info("\nfound resources classes: \n" + StringUtils.join(resClass, '\n'));
         log.info("\nfound singleton instances: \n" + StringUtils.join(_app.getSingletons(), '\n'));
 
         return resources.parallelStream().map(res -> {
-            AjaxResMetaData resMd = AjaxResMetaData.build(res);
+            AjaxResMetadata resMd = AjaxResMetadata.build(res);
             Collection<Class<?>> _clss = CollectionUtils.intersection(resClass, res.getHandlerClasses());
 
             _clss.stream().filter(_cls -> !isSingleton(_cls)).forEach(_cls -> {

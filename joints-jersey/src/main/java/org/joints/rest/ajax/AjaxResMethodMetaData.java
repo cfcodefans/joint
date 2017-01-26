@@ -33,7 +33,7 @@ public class AjaxResMethodMetaData implements Serializable {
 
 	@JsonIgnore
 	@XmlTransient
-	public AjaxResMetaData parent;
+	public AjaxResMetadata parent;
 
 	public static AjaxResMethodMetaData build(ResourceMethod resMd) {
 		if (resMd == null) {
