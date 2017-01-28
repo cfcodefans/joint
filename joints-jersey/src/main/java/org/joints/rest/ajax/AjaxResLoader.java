@@ -34,7 +34,6 @@ public class AjaxResLoader extends ResourceConfig {
         log.info(ProcTrace.flush());
 
         instance = this;
-
     }
 
     private static AjaxResLoader instance = null;

@@ -16,9 +16,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @XmlRootElement
-public class AjaxResMetaData implements Serializable {
+public class AjaxResMetadata implements Serializable {
 
-    public static enum DataType {
+    public enum DataType {
         text, html, script, json, jsonp, xml;
 
         @SuppressWarnings("unchecked")
@@ -55,7 +55,7 @@ public class AjaxResMetaData implements Serializable {
         return baseUrl + (StringUtils.endsWith(baseUrl, "/") || StringUtils.startsWith(path, "/") ? "" : "/") + path;
     }
 
-    public List<AjaxResMetaData> children = new ArrayList<AjaxResMetaData>();
+    public List<AjaxResMetadata> children = new ArrayList<AjaxResMetadata>();
 
     @XmlTransient
     @JsonIgnore
@@ -63,23 +63,23 @@ public class AjaxResMetaData implements Serializable {
 
     @XmlTransient
     @JsonIgnore
-    public AjaxResMetaData parent;
+    public AjaxResMetadata parent;
 
     public List<AjaxResMethodMetaData> methods = new ArrayList<AjaxResMethodMetaData>();
 
-    public static AjaxResMetaData build(Resource res) {
+    public static AjaxResMetadata build(Resource res) {
         if (res == null) {
             return null;
         }
 
-        AjaxResMetaData resMD = new AjaxResMetaData();
+        AjaxResMetadata resMD = new AjaxResMetadata();
 
         resMD.name = CollectionUtils.find(res.getNames(), NotPredicate.notPredicate(EqualPredicate.equalPredicate("[unnamed]")));
         resMD.name = StringUtils.substringAfterLast(resMD.name, ".");
         resMD.path = res.getPath();
 
         res.getChildResources().stream()
-            .map(AjaxResMetaData::build)
+            .map(AjaxResMetadata::build)
             .filter(Objects::nonNull)
             .forEach(subResMD -> {
                 subResMD.parent = resMD;
