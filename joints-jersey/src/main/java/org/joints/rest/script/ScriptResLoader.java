@@ -156,7 +156,7 @@ public class ScriptResLoader extends ResourceConfig {
     public void generateAjaxMetadata(Set<Resource> resSet) {
         AjaxResContext ajaxResContext = AjaxResContext.getInstance(this.getApplicationName());
         ajaxResContext.getProxyList().clear();
-        ajaxResContext.build(resSet);
+        ajaxResContext.build(resSet, this);
     }
 
     private void startWatchScriptFolder(final String startPath) {

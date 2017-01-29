@@ -213,6 +213,7 @@ public class TypeScriptStubs {
 
     static String toTypeSource(AjaxResMethodMetaData method, TypeScriptParseContext ctx) {
         StringBuilder sb = new StringBuilder().append("\t").append(method.name).append('(');
+        String returnTypeName = classToTypeScriptDef(method.returnType, ctx);
 
         List<String> paramStrList = method.params.stream()
             .filter(pmd -> pmd.source != Parameter.Source.CONTEXT && pmd.source != Parameter.Source.BEAN_PARAM)
@@ -222,7 +223,7 @@ public class TypeScriptStubs {
             }).collect(Collectors.toList());
 
         sb.append(StringUtils.join(paramStrList, " ,"));
-        sb.append("): IRestInvocation {\n");
+        sb.append(String.format("): IRestInvocation<%s> {\n", returnTypeName));
         method.params.stream()
             .filter(pmd -> pmd.source != Parameter.Source.CONTEXT
                 && pmd.source != Parameter.Source.BEAN_PARAM) //TODO, it would be too complicated to support bean param, and it is purely for java backend's convenience, is it really practical?
@@ -231,15 +232,16 @@ public class TypeScriptStubs {
         sb.append(String.format("\tlet _params:IParam[] = [%s];\n",
             StringUtils.join(method.params.stream().map(pmd -> '_' + pmd.sourceName).toArray(), ", ")));
 
-        sb.append(String.format("\treturn <IRestInvocation> { \n\t\tparams:_params, " +
+        sb.append(String.format("\treturn <IRestInvocation<%s>> { \n\t\tparams:_params, " +
                 "\n\t\tmethod:HttpMethod.%s, " +
                 "\n\t\tresultType: '%s', " +
                 "\n\t\tpath: '%s', " +
                 "\n\t\tname: '%s'," +
                 "\n\t\tproduceMediaTypes: [%s], " +
                 "\n\t\tconsumedMediaTypes: [%s]};\n}\n",
+            returnTypeName,
             method.httpMethod,
-            classToTypeScriptDef(method.returnType, ctx),
+            returnTypeName,
             method.getPath(),
             method.name,
             StringUtils.join(method.produceMediaTypes.stream().map(type -> String.format("'%s'", type)).toArray(), ","),

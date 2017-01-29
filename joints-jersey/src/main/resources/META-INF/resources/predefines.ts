@@ -43,6 +43,7 @@ export enum Source {
      * Unknown parameter injection source.
      */
     UNKNOWN
+}
 
 export interface IParam {
     value: any;
@@ -54,21 +55,21 @@ export class Param implements IParam {
     value: any;
     name: string;
     source: Source;
-    constructor(_name: string, _source:Source, _value?: any) {
+    constructor(_name: string, _source:Source, _value: any) {
         this.value = _value;
         this.name = _name;
         this.source = _source;
     }
 }
 
-export interface IRestInvocation {
+export interface IRestInvocation<R> {
     params: IParam[];
     method: HttpMethod;
     resultType: any;
     path: string;
     name: string;
-//    onSuccess(resp:any): any;
-//    onError(resp:any): any;
+    onSuccess(resp:any): R;
+    onError(resp:any): R;
     produceMediaTypes: string[];
     consumedMediaTypes: string[];
 }

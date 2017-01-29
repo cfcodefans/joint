@@ -80,7 +80,7 @@ public class AjaxResMetadata implements Serializable {
         AjaxResMetadata resMD = new AjaxResMetadata();
 
         resMD.name = CollectionUtils.find(res.getNames(), NotPredicate.notPredicate(EqualPredicate.equalPredicate("[unnamed]")));
-        resMD.name = StringUtils.substringAfterLast(resMD.name, ".");
+        resMD.name = StringUtils.contains(resMD.name, '.') ? StringUtils.substringAfterLast(resMD.name, ".") : resMD.name;
         resMD.path = res.getPath();
 
         resMD.resource = res;
