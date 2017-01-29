@@ -20,6 +20,7 @@ public class AjaxRes {
 
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
+    @Path("/res.js")
 	public Response getJSProxy(@Context UriInfo uriInfo, @QueryParam("appName") String name) {
 		List<AjaxResMetadata> proxyList = AjaxResContext.getInstance(name).getProxyList();
 		proxyList.forEach(armd -> armd.setBaseUrl(StringUtils.removeEnd(uriInfo.getAbsolutePath().getPath(), "ajax")));
@@ -28,6 +29,7 @@ public class AjaxRes {
 
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
+	@Path("/res.ts")
 	public Response getTypeScriptProxy(@Context UriInfo uriInfo, @QueryParam("appName") String name) {
 		List<AjaxResMetadata> proxyList = AjaxResContext.getInstance(name).getProxyList();
 		proxyList.forEach(armd -> armd.setBaseUrl(StringUtils.removeEnd(uriInfo.getAbsolutePath().getPath(), "ajax")));

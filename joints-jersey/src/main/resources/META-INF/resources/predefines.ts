@@ -43,7 +43,6 @@ export enum Source {
      * Unknown parameter injection source.
      */
     UNKNOWN
-}
 
 export interface IParam {
     value: any;
@@ -68,8 +67,8 @@ export interface IRestInvocation {
     resultType: any;
     path: string;
     name: string;
-    onSuccess(resp:any): any;
-    onError(resp:any): any;
+//    onSuccess(resp:any): any;
+//    onError(resp:any): any;
     produceMediaTypes: string[];
     consumedMediaTypes: string[];
 }

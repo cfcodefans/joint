@@ -10,11 +10,9 @@ import java.util.Map;
 public class TypeScriptStubTests {
     @Test
     public void testQueueCfg() {
-
-        Map<Class, String> classAndTypeSources = TypeScriptStubs.getBasicTypesAndTypeSources();
-        Map<Class, String> classAndTypeNames = TypeScriptStubs.getBasicTypesAndTypeSources();
-        String src = TypeScriptStubs.classToTypeScriptDef(QueueCfg.class, classAndTypeSources, classAndTypeNames);
-        classAndTypeSources.entrySet().stream()
+        TypeScriptStubs.TypeScriptParseContext ctx = new TypeScriptStubs.TypeScriptParseContext();
+        String src = TypeScriptStubs.classToTypeScriptDef(QueueCfg.class, ctx);
+        ctx.classAndTypeSources.entrySet().stream()
             .forEach((Map.Entry<Class, String> en) -> System.out.printf("\n%s -> %s\n", en.getKey(), en.getValue()));
 
     }

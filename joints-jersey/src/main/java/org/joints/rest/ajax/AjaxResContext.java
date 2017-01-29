@@ -38,9 +38,14 @@ public class AjaxResContext {
     }
 
     List<AjaxResMetadata> proxyList = new ArrayList<AjaxResMetadata>();
+    TypeScriptStubs.TypeScriptParseContext typeScriptCtx = new TypeScriptStubs.TypeScriptParseContext();
 
     public List<AjaxResMetadata> getProxyList() {
         return proxyList;
+    }
+
+    public TypeScriptStubs.TypeScriptParseContext getTypeScriptCtx() {
+        return typeScriptCtx;
     }
 
     public void build(final ResourceModel _resModel, final Application _app) {
@@ -53,6 +58,9 @@ public class AjaxResContext {
         }
         List<AjaxResMetadata> resMetaDataList = getAjaxResMetaDatas(_app, resources);
         proxyList.addAll(resMetaDataList);
+
+        resMetaDataList.forEach(rmd -> TypeScriptStubs.toTypeSource(rmd, typeScriptCtx));
+        log.info(typeScriptCtx);
     }
 
     public void build(final Collection<Resource> resources) {

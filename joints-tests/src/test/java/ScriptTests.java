@@ -177,7 +177,7 @@ public class ScriptTests {
     @Test
     public void testNashorn() throws ScriptException {
         NashornScriptEngineFactory nsef = new NashornScriptEngineFactory();
-        NashornScriptEngine nse = (NashornScriptEngine) nsef.getScriptEngine("--language=es6");
+        NashornScriptEngine nse = (NashornScriptEngine) nsef.getScriptEngine();
 
         nse.getContext().setWriter(new PrintWriter(System.out));
 //        nse.eval("var double = i=>i * 2");

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.functors.EqualPredicate;
 import org.apache.commons.collections4.functors.NotPredicate;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.glassfish.jersey.server.model.Resource;
 import org.joints.commons.MiscUtils;
@@ -65,6 +66,10 @@ public class AjaxResMetadata implements Serializable {
     @JsonIgnore
     public AjaxResMetadata parent;
 
+    @XmlTransient
+    @JsonIgnore
+    public transient Resource resource;
+
     public List<AjaxResMethodMetaData> methods = new ArrayList<AjaxResMethodMetaData>();
 
     public static AjaxResMetadata build(Resource res) {
@@ -77,6 +82,8 @@ public class AjaxResMetadata implements Serializable {
         resMD.name = CollectionUtils.find(res.getNames(), NotPredicate.notPredicate(EqualPredicate.equalPredicate("[unnamed]")));
         resMD.name = StringUtils.substringAfterLast(resMD.name, ".");
         resMD.path = res.getPath();
+
+        resMD.resource = res;
 
         res.getChildResources().stream()
             .map(AjaxResMetadata::build)
@@ -91,6 +98,10 @@ public class AjaxResMetadata implements Serializable {
             .filter(Objects::nonNull)
             .forEach(resMD.methods::add);
 
+        resMD.methods.forEach(methodMeta -> methodMeta.parent = resMD);
+
+        resMD.baseUrl = res.getPath();
+
         return resMD;
     }
 
@@ -102,5 +113,19 @@ public class AjaxResMetadata implements Serializable {
     public void appendInjectedParams(List<ParamMetaData> _params) {
         children.forEach(armd -> armd.appendInjectedParams(_params));
         methods.forEach(md -> md.params.addAll(_params));
+    }
+
+    public static List<AjaxResMethodMetaData> flatten(List<AjaxResMetadata> resMetadataList, List<AjaxResMethodMetaData> methodMetaDataList) {
+        if (CollectionUtils.isEmpty(resMetadataList)) return methodMetaDataList;
+        for (AjaxResMetadata ajaxResMetadata : resMetadataList) {
+            methodMetaDataList.addAll(ajaxResMetadata.methods);
+            flatten(ajaxResMetadata.children, methodMetaDataList);
+        }
+        return methodMetaDataList;
+    }
+
+    public static List<AjaxResMethodMetaData> flatten(AjaxResMetadata...resMetadatas) {
+        if (ArrayUtils.isEmpty(resMetadatas)) return Collections.emptyList();
+        return flatten(Arrays.asList(resMetadatas), new ArrayList<AjaxResMethodMetaData>());
     }
 }
