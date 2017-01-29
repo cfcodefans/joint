@@ -2,8 +2,7 @@ export enum HttpMethod {
            GET, POST, PUT, DELETE, HEAD, OPTIONS
        }
 
-export
-enum Source {
+export enum Source {
     /**
      * Cookie parameter injection source.
      */
@@ -66,9 +65,11 @@ export class Param implements IParam {
 export interface IRestInvocation {
     params: IParam[];
     method: HttpMethod;
-    result: any;
+    resultType: any;
     path: string;
     name: string;
     onSuccess(resp:any): any;
     onError(resp:any): any;
+    produceMediaTypes: string[];
+    consumedMediaTypes: string[];
 }

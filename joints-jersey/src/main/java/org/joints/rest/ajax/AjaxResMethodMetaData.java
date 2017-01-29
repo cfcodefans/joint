@@ -5,11 +5,13 @@ import com.sun.research.ws.wadl.HTTPMethods;
 import org.apache.commons.lang3.EnumUtils;
 import org.glassfish.jersey.server.model.ResourceMethod;
 import org.glassfish.jersey.server.model.ResourceMethod.JaxrsType;
+import org.joints.commons.MiscUtils;
 
 import javax.ws.rs.core.MediaType;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
 import java.io.Serializable;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -55,7 +57,9 @@ public class AjaxResMethodMetaData implements Serializable {
 			aResMd.returnType = aResMd.returnType.getComponentType();
 		} else if (Collection.class.isAssignableFrom(aResMd.returnType)) {
 			aResMd.isArray = true;
-			aResMd.returnType = resMd.getInvocable().getDefinitionMethod().getGenericReturnType().
+            Type genericReturnType = resMd.getInvocable().getDefinitionMethod().getGenericReturnType();
+            Class[] parameterizedClzz = MiscUtils.getParameterizedClzz(genericReturnType);
+            aResMd.returnType = parameterizedClzz[0];
 		}
 
 		aResMd.jaxrsType = resMd.getType();

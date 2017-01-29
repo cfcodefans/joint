@@ -13,8 +13,10 @@ import org.glassfish.jersey.server.model.Parameter;
 import org.joints.commons.Jsons;
 import org.joints.commons.MiscUtils;
 
+import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by fan on 2017/1/24.
@@ -39,19 +41,16 @@ public class TypeScriptStubs {
         return classAndTypeSources;
     }
 
-    private static Map<Class, String> basicTypesAndTypeSources = getBasicTypesAndTypeSources();
+    public static class TypeScriptParseContext implements Serializable {
+        public final Map<Class, String> classAndTypeNames = getBasicTypesAndTypeSources();
+        public final Map<Class, String> classAndTypeSources = new HashMap<>();
+    }
 
-    public static String classToTypeScriptDef(Class cls, Map<Class, String> classAndTypeSources, Map<Class, String> classAndTypeNames) {
+    public static String classToTypeScriptDef(Class cls, TypeScriptParseContext ctx) {
         if (cls == null) return StringUtils.EMPTY;
 
-        if (classAndTypeSources == null) {
-            classAndTypeSources = new HashMap<>();
-        }
-
-        if (classAndTypeNames == null) {
-            classAndTypeNames = getBasicTypesAndTypeSources();
-        }
-
+        Map<Class, String> classAndTypeSources = ctx.classAndTypeSources;
+        Map<Class, String> classAndTypeNames = ctx.classAndTypeNames;
         {
             String typeName = classAndTypeNames.get(cls);
             if (StringUtils.isNotBlank(typeName))
@@ -78,7 +77,7 @@ public class TypeScriptStubs {
 
         if (cls.isArray()) {
             Class componentType = cls.getComponentType();
-            String sourceType = classToTypeScriptDef(componentType, classAndTypeSources, classAndTypeNames);
+            String sourceType = classToTypeScriptDef(componentType, ctx);
             if (StringUtils.isNotBlank(sourceType)) {
                 return String.format("%s[]", sourceType);
             } else {
@@ -115,12 +114,12 @@ public class TypeScriptStubs {
 
             if (Collection.class.isAssignableFrom(returnClz)) {
                 Class[] parameterizedClzz = MiscUtils.getParameterizedClzz(md.getGenericReturnType());
-                String typeName = classToTypeScriptDef(parameterizedClzz[0], classAndTypeSources, classAndTypeNames);
+                String typeName = classToTypeScriptDef(parameterizedClzz[0], ctx);
                 sb.append(String.format("\t%s: %s[];\n", propDef.getName(), typeName));
             } else if (returnClz.isAnnotation()) {
                 continue;
             } else {
-                String typeName = classToTypeScriptDef(returnClz, classAndTypeSources, classAndTypeNames);
+                String typeName = classToTypeScriptDef(returnClz, ctx);
                 sb.append(String.format("\t%s: %s;\n", propDef.getName(), typeName));
             }
         }
@@ -140,7 +139,7 @@ public class TypeScriptStubs {
         }
     }
 
-    public static Map<AjaxResMetadata, String> getResourceAndTypeSources(List<AjaxResMetadata> metadataList, Map<Class, String> classAndTypeNames) {
+    public static Map<AjaxResMetadata, String> getResourceAndTypeSources(List<AjaxResMetadata> metadataList, TypeScriptParseContext ctx) {
         Map<AjaxResMetadata, String> reMap = new HashMap<>();
         if (CollectionUtils.isEmpty(metadataList))
             return reMap;
@@ -151,32 +150,59 @@ public class TypeScriptStubs {
         return reMap;
     }
 
-    static String toTypeSource(AjaxResMetadata md, Map<Class, String> classAndTypeNames) {
+    static String toTypeSource(AjaxResMetadata md, TypeScriptParseContext ctx) {
         StringBuilder sb = new StringBuilder();
         if (md == null) return sb.toString();
 
-        sb.append(String.format("class %s extends IRestInvocation {\n", md.name));
+        sb.append(String.format("class %s {\n", md.name));
         sb.append(String.format("\turl: string = '%s';\n", md.getUrl()));
 
         md.injectedParams.stream()
-            .filter(pmd->pmd.source != Parameter.Source.CONTEXT)
-            .forEach(pmd->sb.append(String.format("\t%s: Param = new Param('%s', '%s');\n", pmd.sourceName, pmd.sourceName, pmd.source)));
+                .filter(pmd -> pmd.source != Parameter.Source.CONTEXT
+                        && pmd.source != Parameter.Source.BEAN_PARAM) //TODO, it would be too complicate to support bean param, and it is purely for java backend's convenience, is it really practical?
+                .forEach(pmd -> sb.append(String.format("\t%s: Param = new Param('%s', '%s', '%s');\n", pmd.sourceName, pmd.source, "")));
 
         sb.append(String.format("\tparams():IParam[] {return new Array[IParam]{%s};}\n",
-            StringUtils.join(md.injectedParams.stream().map(pmd -> pmd.sourceName).toArray(), " ,")));
+                StringUtils.join(md.injectedParams.stream().map(pmd -> pmd.sourceName).toArray(), " ,")));
 
         sb.append(StringUtils.join(md.methods.stream()
-            .map(rmd->toTypeSource(rmd, classAndTypeNames)).toArray(), "\n"));
+                .map(rmd -> toTypeSource(rmd, ctx)).toArray(), "\n"));
 
         sb.append("\n}");
         return sb.toString();
     }
 
-    static String toTypeSource(ParamMetaData param, Map<Class, String> classAndTypeNames) {
+    static String toTypeSource(ParamMetaData param, TypeScriptParseContext ctx) {
 
     }
 
-    static String toTypeSource(AjaxResMethodMetaData method, Map<Class, String> classAndTypeNames) {
+    static String toTypeSource(AjaxResMethodMetaData method, TypeScriptParseContext ctx) {
+        StringBuilder sb = new StringBuilder(method.name).append('(');
 
+        List<String> paramStrList = method.params.stream().map(pmd -> {
+            String paramType = toTypeSource(pmd, ctx);
+            return String.format("%s: %s", pmd.sourceName, paramType);
+        }).collect(Collectors.toList());
+
+        sb.append(StringUtils.join(paramStrList, ','));
+        sb.append("): IRestInvocation {\n");
+        method.params.stream()
+                .filter(pmd -> pmd.source != Parameter.Source.CONTEXT
+                        && pmd.source != Parameter.Source.BEAN_PARAM) //TODO, it would be too complicate to support bean param, and it is purely for java backend's convenience, is it really practical?
+                .forEach(pmd -> sb.append(String.format("\tlet %s: Param = new Param('%s', '%s', %s);\n", pmd.sourceName, pmd.source, pmd.sourceName)));
+
+        sb.append(String.format("\tlet _params:IParam[] new Array[IParam]{%s};\n",
+                StringUtils.join(method.params.stream().map(pmd -> pmd.sourceName).toArray(), " ,")));
+
+        sb.append(String.format("return <IRestInvocation>{params:_params, " +
+                        "method:HttpMethod.%s, " +
+                        "resultType:%s, " +
+                        "path: %s}",
+                                method.httpMethod,
+                                classToTypeScriptDef(method.returnType, ctx),
+                                method.
+                                ))
+
+        return sb.toString();
     }
 }

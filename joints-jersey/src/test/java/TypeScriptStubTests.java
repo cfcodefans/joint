@@ -200,10 +200,9 @@ public class TypeScriptStubTests {
         SimplePOJO sp = new SimplePOJO();
 //        System.out.println(Jsons.toString(sp));
 
-        Map<Class, String> classAndTypeSources = TypeScriptStubs.getBasicTypesAndTypeSources();
-        Map<Class, String> classAndTypeNames = TypeScriptStubs.getBasicTypesAndTypeSources();
-        String src = TypeScriptStubs.classToTypeScriptDef(SimplePOJO.class, classAndTypeSources, classAndTypeNames);
-        System.out.println(classAndTypeSources.get(SimplePOJO.class));
+        TypeScriptStubs.TypeScriptParseContext ctx = new TypeScriptStubs.TypeScriptParseContext();
+        String src = TypeScriptStubs.classToTypeScriptDef(SimplePOJO.class, ctx);
+        System.out.println(ctx.classAndTypeSources.get(SimplePOJO.class));
     }
 
     public static class EnumHolder {
@@ -232,12 +231,11 @@ public class TypeScriptStubTests {
         EnumHolder eh = new EnumHolder();
 //        System.out.println(Jsons.toString(eh));
 
-        Map<Class, String> classAndTypeSources = TypeScriptStubs.getBasicTypesAndTypeSources();
-        Map<Class, String> classAndTypeNames = TypeScriptStubs.getBasicTypesAndTypeSources();
-        String src = TypeScriptStubs.classToTypeScriptDef(EnumHolder.class, classAndTypeSources, classAndTypeNames);
+        TypeScriptStubs.TypeScriptParseContext ctx = new TypeScriptStubs.TypeScriptParseContext();
+        String src = TypeScriptStubs.classToTypeScriptDef(EnumHolder.class, ctx);
 //        System.out.println(classAndTypeSources.get(EnumHolder.class));
 
-        classAndTypeSources.entrySet().stream()
-            .forEach((Map.Entry<Class, String> en) -> System.out.printf("\n%s -> %s\n", en.getKey(), en.getValue()));
+        ctx.classAndTypeSources.entrySet().stream()
+                .forEach((Map.Entry<Class, String> en) -> System.out.printf("\n%s -> %s\n", en.getKey(), en.getValue()));
     }
 }
