@@ -1,4 +1,4 @@
-import entity.QueueCfg;
+import org.joint.amqp.config.QueueCfg;
 import org.joints.rest.ajax.TypeScriptStubs;
 import org.junit.Test;
 
