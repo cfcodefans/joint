@@ -1,4 +1,4 @@
-package org.joint.amqp.config;
+package org.joint.amqp.entity;
 
 /**
  * Created by fan on 2017/1/30.

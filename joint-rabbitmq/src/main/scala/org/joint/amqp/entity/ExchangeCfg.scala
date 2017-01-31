@@ -1,4 +1,4 @@
-package org.joint.amqp.config
+package org.joint.amqp.entity
 
 import java.util.Objects
 import javax.persistence._

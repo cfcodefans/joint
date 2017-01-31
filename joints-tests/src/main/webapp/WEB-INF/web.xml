@@ -69,11 +69,11 @@
                     <param-value>org.joints.web.mvc.MvcResLoader</param-value>
                 </init-param>
                 <init-param>
-                    <param-name>jersey.config.server.provider.packages</param-name>
+                    <param-name>jersey.entity.server.provider.packages</param-name>
                     <param-value>org.joints.web.mvc</param-value>
                 </init-param>
                 <init-param>
-                    <param-name>jersey.config.server.mvc.templateBasePath</param-name>
+                    <param-name>jersey.entity.server.mvc.templateBasePath</param-name>
                     <param-value>pages</param-value>
                 </init-param>
                 <init-param>

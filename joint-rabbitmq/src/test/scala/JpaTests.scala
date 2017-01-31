@@ -38,7 +38,8 @@ class JpaTests {
         tx.commit()
     }
 
-    @Test def validateEntities() {
+    @Test
+    def validateEntities() {
         log.info(String.format("sc %s", em.createQuery("select count(id) from ServerCfg sc").getSingleResult))
         log.info(String.format("exc %s", em.createQuery("select count(id) from ExchangeCfg ec").getSingleResult))
         log.info(String.format("qc %s", em.createQuery("select count(id) from QueueCfg qc").getSingleResult))

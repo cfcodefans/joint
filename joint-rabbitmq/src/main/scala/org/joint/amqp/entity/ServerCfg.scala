@@ -1,4 +1,4 @@
-package org.joint.amqp.config
+package org.joint.amqp.entity
 
 import java.io.Serializable
 import java.net.{URI, URLEncoder}
@@ -38,6 +38,9 @@ class ServerCfg extends BaseEntity with Serializable with Supplier[URI] with (()
 
     @BeanProperty
     var logFilePath: String = null
+
+    @BeanProperty
+    var logFileSize: String = "2GB"
 
     override def toString = s"ServerCfg(id=$id, host=$host, port=$port, username=$username, password=$password, virtualHost=$virtualHost, logFilePath=$logFilePath)"
 

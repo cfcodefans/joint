@@ -1,4 +1,4 @@
-package org.joint.amqp.config
+package org.joint.amqp.entity
 
 import java.io.Serializable
 import javax.persistence.{Basic, Column}
