@@ -39,10 +39,10 @@ class ConsumerActor(val ch: Channel, val queueCfg: QueueCfg) extends DefaultCons
     override def handleDelivery(consumerTag: String, envelope: Envelope, properties: AMQP.BasicProperties, body: Array[Byte]) {
         val d = new QueueingConsumer.Delivery(envelope, properties, body)
         val mc = new MessageContext(queueCfg, d)
-        val sc = queueCfg.getServerCfg
+        val sc = queueCfg.getServer
         _info(sc, "get message: " + d.getEnvelope.getDeliveryTag + " for q: " + queueCfg.getName + " on server " + sc.getVirtualHost)
         // TODO use injection to decouple dependency
-        MsgMonitor.prefLog(mc, ConsumerActor.log)
+        MsgMonitor._actor.!(mc)
         HttpDispatcherActor.instance.handover(mc)
     }
 }

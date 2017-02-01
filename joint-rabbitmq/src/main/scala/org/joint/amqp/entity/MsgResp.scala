@@ -12,12 +12,17 @@ object MsgResp {
 }
 
 class MsgResp extends Serializable with Cloneable {
-    import MsgResp._
+
+    def this(_statusCode: Int, respStr: String) = {
+        this()
+        this.responseStr = respStr
+        this.statusCode = _statusCode
+    }
 
     @Basic
     @BeanProperty
     var statusCode = 200
-    
+
     @Basic
     @Column(name = "responseStr", columnDefinition = "TEXT", nullable = true) //mysql
     @BeanProperty

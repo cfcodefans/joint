@@ -1,6 +1,7 @@
 package org.joint.amqp.entity
 
 import java.io.Serializable
+import java.util.Arrays
 import javax.persistence._
 import javax.xml.bind.annotation.{XmlRootElement, XmlTransient}
 
@@ -25,6 +26,13 @@ class MessageContext extends Serializable with Cloneable {
 
     import MessageContext._
 
+    def this(qc: QueueCfg, d: Delivery) = {
+        this()
+        this.queueCfg = qc
+        this.setDelivery(d)
+    }
+
+
     @Transient
     @XmlTransient
     @JsonIgnore
@@ -34,6 +42,11 @@ class MessageContext extends Serializable with Cloneable {
     @XmlTransient
     @BeanProperty
     var delivery: Delivery = null
+
+    def setDelivery(d: Delivery): Unit = {
+        delivery = d
+        setMessageBody(delivery.getBody)
+    }
 
     @Basic
     @BeanProperty
@@ -48,6 +61,12 @@ class MessageContext extends Serializable with Cloneable {
     @Lob
     @BeanProperty
     var messageBody: Array[Byte] = new Array[Byte](0)
+
+    def setMessageBody(messageBody: Array[Byte]) {
+        this.messageBody = messageBody
+        this.bodyHash = Arrays.hashCode(messageBody)
+    }
+
 
     @ManyToOne(fetch = FetchType.EAGER, cascade = Array(CascadeType.REFRESH))
     @JoinColumn(name = "queue_cfg_id")
