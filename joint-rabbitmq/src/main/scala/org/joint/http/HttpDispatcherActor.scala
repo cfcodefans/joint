@@ -3,12 +3,10 @@ package org.joint.http
 import java.io.{IOException, UnsupportedEncodingException}
 import java.net.URLEncoder
 import java.nio.charset.Charset
+import java.util
 import java.util.concurrent.Executors
 import java.util.function.Consumer
-import javafx.concurrent.Worker
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import org.apache.commons.collections4.MapUtils
 import org.apache.commons.lang3.time.StopWatch
 import org.apache.commons.lang3.{CharEncoding, ObjectUtils, StringUtils}
@@ -38,27 +36,30 @@ object HttpDispatcherActor {
     val DEFAULT_TIMEOUT: Int = 30000
     val CLIENT_NUM: Int = MiscUtils.AVAILABLE_PROCESSORS * 5
 
-    private val system = ActorSystem(classOf[HttpDispatcherActor].getSimpleName)
-    private var router: Router = {
-        val routees = Vector.fill(MiscUtils.AVAILABLE_PROCESSORS) {
-            val r = system.actorOf(Props[HttpDispatcherActor])
-            ActorRefRoutee(r)
-        }
-        Router(RoundRobinRoutingLogic(), routees)
-    }
+    //    private val system: ActorSystem = ActorSystem(classOf[HttpDispatcherActor].getSimpleName)
+    //    var router: Router = {
+    //        val routees: Vector[Routee] = Vector.fill(MiscUtils.AVAILABLE_PROCESSORS) {
+    //            val r = system.actorOf(Props[HttpDispatcherActor](new HttpDispatcherActor))
+    //            ActorRefRoutee(r)
+    //        }
+    //        Router(RoundRobinRoutingLogic(), routees)
+    //    }
 
-    val _actor: ActorRef = {
-        system.actorOf(Props[HttpDispatcherActor](new HttpDispatcherActor))
-    }
+    lazy val instance: HttpDispatcherActor = new HttpDispatcherActor
+
     val log: Logger = LogManager.getLogger(classOf[HttpDispatcherActor])
     val CHARSET: Charset = Charset.forName(CharEncoding.UTF_8)
 
     private[http] val DEFAULT_REQ_CFG: RequestConfig = RequestConfig.custom.setConnectTimeout(DEFAULT_TIMEOUT).setSocketTimeout(DEFAULT_TIMEOUT).setConnectTimeout(DEFAULT_TIMEOUT).build
+    private[http] val timeoutAndReqCfgs: java.util.Map[Int, RequestConfig] = new util.concurrent.ConcurrentHashMap[Int, RequestConfig]();
 
-    def getParams(nameAndValues: String*): Seq[NameValuePair] = 0.until(nameAndValues.size, 2).map(i => new BasicNameValuePair(nameAndValues(i), nameAndValues(i + 1)))
+    def getParams(nameAndValues: String*): Seq[NameValuePair] = {
+        0.until(nameAndValues.size, 2).map(i => new BasicNameValuePair(nameAndValues(i), nameAndValues(i + 1)))
+    }
+
 }
 
-class HttpDispatcherActor extends Actor with Consumer[MessageContext] {
+class HttpDispatcherActor extends Consumer[MessageContext] {
 
     import HttpDispatcherActor._
 
@@ -73,7 +74,6 @@ class HttpDispatcherActor extends Actor with Consumer[MessageContext] {
         val origin = ObjectUtils.defaultIfNull(headers.get("consumer_target"), defaultUrl).toString
         return if (StringUtils.isBlank(origin)) defaultUrl else origin
     }
-
 
     override def accept(mc: MessageContext): Unit = {
         val qc: QueueCfg = mc.getQueueCfg
@@ -90,8 +90,9 @@ class HttpDispatcherActor extends Actor with Consumer[MessageContext] {
                 //				GzipCompressingEntity ze = new GzipCompressingEntity(fe);
                 post.setEntity(fe)
                 req = post
+            } else {
+                req = new HttpGet(destUrlStr + "?" + URLEncoder.encode(bodyStr, "UTF-8"))
             }
-            else req = new HttpGet(destUrlStr + "?" + URLEncoder.encode(bodyStr, "UTF-8"))
         } catch {
             case e: UnsupportedEncodingException => {
                 log.error("fail to encode message: " + bodyStr, e)
@@ -102,17 +103,17 @@ class HttpDispatcherActor extends Actor with Consumer[MessageContext] {
         val httpClientCtx = HttpClientContext.create
         val timeout = Math.max(destCfg.getTimeout, DEFAULT_TIMEOUT).toInt
         httpClientCtx.setRequestConfig(
-            RequestConfig.custom.setConnectionRequestTimeout(timeout).setSocketTimeout(timeout).setConnectTimeout(timeout).build
+            timeoutAndReqCfgs.computeIfAbsent(timeout, (timeout: Int) => RequestConfig.custom.setConnectionRequestTimeout(timeout).setSocketTimeout(timeout).setConnectTimeout(timeout).build)
         )
-        // }
+
         val clientArray: Array[FutureRequestExecutionService] = closeableHttpClients
         clientArray((mc.getDelivery.getEnvelope.getDeliveryTag % clientArray.length).toInt)
             .execute(req, httpClientCtx, new RespHandler(mc))
     }
 
-    override def receive: Receive = {
-        case (mc: MessageContext) => accept(mc)
-    }
+    //    override def receive: Receive = {
+    //        case (mc: MessageContext) => accept(mc)
+    //    }
 
     private lazy val closeableHttpClients: Array[FutureRequestExecutionService] =
         (0 until CLIENT_NUM toArray).map(i => {
@@ -158,7 +159,7 @@ private[http] class RespHandler(var mc: MessageContext) extends ResponseHandler[
         sw.stop()
         val time = sw.getTime
         val deliveryTag = mc.getDelivery.getEnvelope.getDeliveryTag
-        log.error(String.format("Message: %d failed after %d ms \n gettng response from url: \n%s", deliveryTag, time, mc.getQueueCfg.getDestCfg.getUrl), e)
+        log.error(String.format("Message: %d failed after %d ms \n getting response from url: \n%s", deliveryTag, time, mc.getQueueCfg.getDestCfg.getUrl), e)
         mc.setResponse(new MsgResp(MsgResp.FAILED, String.format("{status: %s, resp: '%s', time: %d}", e.getClass.getSimpleName, e.getMessage, time)))
         MsgMonitor.prefLog(mc, log)
         Responder.instance(deliveryTag).handover(mc)

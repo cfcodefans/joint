@@ -32,7 +32,6 @@ class MessageContext extends Serializable with Cloneable {
         this.setDelivery(d)
     }
 
-
     @Transient
     @XmlTransient
     @JsonIgnore
@@ -67,7 +66,6 @@ class MessageContext extends Serializable with Cloneable {
         this.bodyHash = Arrays.hashCode(messageBody)
     }
 
-
     @ManyToOne(fetch = FetchType.EAGER, cascade = Array(CascadeType.REFRESH))
     @JoinColumn(name = "queue_cfg_id")
     @XmlTransient
@@ -84,11 +82,12 @@ class MessageContext extends Serializable with Cloneable {
 
     def fail: Long = {
         this.timestamp = System.currentTimeMillis
-        failTimes += 1;
+        failTimes += 1
         return failTimes
     }
 
-    @Transient def isExceedFailTimes: Boolean = {
+    @Transient
+    def isExceedFailTimes: Boolean = {
         if (queueCfg != null) {
             val retryLimit = queueCfg.getRetryLimit
             return failTimes >= (if (retryLimit < 0) DEFAULT_RETRY_LIMIT else retryLimit)
@@ -96,5 +95,6 @@ class MessageContext extends Serializable with Cloneable {
         return failTimes > DEFAULT_RETRY_LIMIT
     }
 
-    @Transient def isSucceeded: Boolean = response != null && StringUtils.equalsIgnoreCase(response.getResponseStr, "ok")
+    @Transient
+    def isSucceeded: Boolean = response != null && StringUtils.equalsIgnoreCase(response.getResponseStr, "ok")
 }

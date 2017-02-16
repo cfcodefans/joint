@@ -9,6 +9,8 @@ import org.apache.logging.log4j.{LogManager, Logger}
 import org.joint.amqp.entity.{MessageContext, QueueCfg, ServerCfg}
 import org.joint.amqp.logging.ConsumerLoggers._
 import org.joint.amqp.manager.MsgMonitor
+import org.joint.failsafe.FailedMessageSqlStorage
+import org.joint.http.HttpDispatcherActor
 import org.joints.commons.MiscUtils
 
 /**
@@ -43,7 +45,7 @@ class ConsumerActor(val ch: Channel, val queueCfg: QueueCfg) extends DefaultCons
         _info(sc, "get message: " + d.getEnvelope.getDeliveryTag + " for q: " + queueCfg.getName + " on server " + sc.getVirtualHost)
         // TODO use injection to decouple dependency
         MsgMonitor._actor.!(mc)
-        HttpDispatcherActor.instance.handover(mc)
+        HttpDispatcherActor.instance.accept(mc)
     }
 }
 
@@ -101,5 +103,10 @@ class QueueCtx(val _ch: Channel, val _queueCfg: QueueCfg) extends ShutdownListen
         }
         MQueueMgr.stopQueue(qc)
     }
+}
+
+object Responder {
+    protected val log: Logger = LogManager.getLogger(this.getClass)
+    private val failsafe = FailedMessageSqlStorage.instance
 }
 
