@@ -7,12 +7,29 @@ import javax.xml.bind.annotation.{XmlRootElement, XmlTransient}
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.rabbitmq.client.QueueingConsumer.Delivery
-import org.apache.commons.lang3.StringUtils
+import com.rabbitmq.client.{AMQP, Envelope, QueueingConsumer}
+import org.apache.commons.lang3.{ObjectUtils, StringUtils}
 
 import scala.beans.BeanProperty
 
 object MessageContext {
     val DEFAULT_RETRY_LIMIT: Int = 100
+
+    def clone(d: QueueingConsumer.Delivery): QueueingConsumer.Delivery = {
+        if (d == null) return d
+        new QueueingConsumer.Delivery(clone(d.getEnvelope), clone(d.getProperties), ObjectUtils.clone(d.getBody))
+    }
+
+    def clone(ev: Envelope): Envelope = {
+        if (ev == null) return ev
+        new Envelope(ev.getDeliveryTag, ev.isRedeliver, ev.getExchange, ev.getRoutingKey)
+    }
+
+    def clone(p: AMQP.BasicProperties): AMQP.BasicProperties = {
+        if (p == null) return p
+        new AMQP.BasicProperties(p.getContentType, p.getContentEncoding, p.getHeaders, p.getDeliveryMode, p.getPriority, p.getCorrelationId, p.getReplyTo, p.getExpiration, p.getMessageId, p.getTimestamp, p.getType, p.getUserId, p.getAppId, p.getClusterId)
+    }
+
 }
 
 /**
@@ -39,10 +56,11 @@ class MessageContext extends Serializable with Cloneable {
 
     @Transient
     @XmlTransient
-    @BeanProperty
-    var delivery: Delivery = null
+    private var delivery: Delivery = null
 
-    def setDelivery(d: Delivery): Unit = {
+    def getDelivery(): Delivery = delivery
+
+    def setDelivery(d: Delivery) {
         delivery = d
         setMessageBody(delivery.getBody)
     }
@@ -58,8 +76,9 @@ class MessageContext extends Serializable with Cloneable {
 
     @Column(name = "msg_content", length = 10000)
     @Lob
-    @BeanProperty
     var messageBody: Array[Byte] = new Array[Byte](0)
+
+    def getMessageBody(): Array[Byte] = messageBody
 
     def setMessageBody(messageBody: Array[Byte]) {
         this.messageBody = messageBody
@@ -97,4 +116,41 @@ class MessageContext extends Serializable with Cloneable {
 
     @Transient
     def isSucceeded: Boolean = response != null && StringUtils.equalsIgnoreCase(response.getResponseStr, "ok")
+
+    override def clone: MessageContext = {
+        val mc = new MessageContext
+        mc.id = id
+        mc.bodyHash = bodyHash
+        mc.delivery = MessageContext.clone(delivery)
+        mc.failTimes = failTimes
+        mc.messageBody = messageBody
+        mc.queueCfg = queueCfg
+        mc.timestamp = timestamp
+        mc.response = response.clone
+        mc
+    }
+
+
+    def canEqual(other: Any): Boolean = other.isInstanceOf[MessageContext]
+
+    override def equals(other: Any): Boolean = other match {
+        case that: MessageContext =>
+            (that canEqual this) && {
+                if (id == that.id && id != 0) true
+                else if (this.queueCfg != that.queueCfg) false
+                else delivery == that.delivery
+            }
+        case _ => false
+    }
+
+    override def hashCode(): Int = {
+        if (id >= 0) return id.toInt;
+
+        var hashCode: Int = 31 * id.toInt
+        if (queueCfg != null)
+            hashCode += 31 * queueCfg.hashCode()
+        if (delivery != null)
+            hashCode += 31 * delivery.hashCode()
+        return hashCode
+    }
 }

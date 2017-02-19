@@ -21,7 +21,7 @@ class MsgResp extends Serializable with Cloneable {
 
     @Basic
     @BeanProperty
-    var statusCode = 200
+    var statusCode: Int = 200
 
     @Basic
     @Column(name = "responseStr", columnDefinition = "TEXT", nullable = true) //mysql
@@ -45,4 +45,6 @@ class MsgResp extends Serializable with Cloneable {
         val state = Seq(statusCode, responseStr)
         state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
     }
+
+    override def clone = new MsgResp(statusCode, responseStr)
 }

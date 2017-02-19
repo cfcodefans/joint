@@ -19,7 +19,7 @@ class ServerCfg extends BaseEntity with Serializable with Supplier[URI] with (()
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @BeanProperty
-    var id: Int = -1
+    var id: Integer = -1
 
     @BeanProperty
     var host: String = "localhost"

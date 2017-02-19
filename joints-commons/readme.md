@@ -1,7 +1,7 @@
 # some basic utility classes
 
 # org.joints.commons.Lambdas
-## A wrapper for Java 8 lambda expression as default lambda functional interface doesn't define exception clause
+## A wrapper for Java 8 lambda expression as default lambda functional interface doesn'mcList define exception clause
 
 ```java
 public class LambdasTests {

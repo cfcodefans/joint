@@ -2,10 +2,17 @@ package org.joint.failsafe
 
 import java.util
 import java.util.function.Consumer
+import javax.persistence.EntityManager
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
+import org.apache.commons.collections4.CollectionUtils
 import org.apache.logging.log4j.{LogManager, Logger}
+import org.joint.akka.BatchActor
 import org.joint.amqp.entity.MessageContext
+import org.joint.http.HttpDispatcherActor
+import org.joints.commons.persistence.jpa.cdi.TransactionalInterceptor
+
+import scala.concurrent.duration._
 
 /**
   * Created by fan on 2017/2/2.
@@ -16,26 +23,47 @@ object FailedMessageSqlStorage {
     private val system: ActorSystem = ActorSystem(classOf[FailedMessageSqlStorage].getSimpleName)
     lazy val instance: ActorRef = system.actorOf(Props[FailedMessageSqlStorage](new FailedMessageSqlStorage))
     private val batchSize: Int = 100
-    private val batchInterval: Long = 1000
+    private val batchInterval: Long = 1
 }
 
-class FailedMessageSqlStorage extends Actor with Consumer[MessageContext] {
 
-    import FailedMessageSqlStorage._
+import org.joint.failsafe.FailedMessageSqlStorage._
 
-    private var em = null
-
-    private val batchList: util.LinkedList[MessageContext] = new util.LinkedList[MessageContext]()
+class FailedMessageSqlStorage extends BatchActor[MessageContext](batchInterval.millisecond, batchSize) with Consumer[util.Collection[MessageContext]] {
     private val lastBatchTime: Long = 0
 
-    override def receive: Receive = {
-        case (msgCtx: MessageContext) => accept(msgCtx)
+    override def accept(mcList: util.Collection[MessageContext]): Unit = {
+        if (CollectionUtils.isEmpty(mcList)) return
+        TransactionalInterceptor.withTransaction(saveFailedMessageContexts, mcList)
     }
 
-    override def accept(mc: MessageContext): Unit = {
-        if (batchList.size() <= batchSize) {
-            batchList.add(mc)
-            return
+    def saveFailedMessageContexts(em: EntityManager, mcList: List[MessageContext]): Unit = {
+        for (mc: MessageContext <- mcList.distinct) {
+            saveFailedMessageContext(em, mc)
         }
     }
+
+    def saveFailedMessageContext(em: EntityManager, mc: MessageContext): Unit = {
+        if (mc.isSucceeded && mc.id > 0) {
+            val q = em.createQuery("delete from MessageContext mc where mc.id=:id")
+            q.setParameter("id", mc.id)
+            q.executeUpdate
+            return
+        }
+
+        var _mc: MessageContext = if (mc.id > 0) em.find(classOf[MessageContext], mc.getId) else null
+        if (_mc == null) {
+            _mc = em.merge(mc)
+            mc.setId(_mc.id)
+            HttpDispatcherActor.instance.accept(mc)
+            return
+        }
+
+        _mc.setDelivery(MessageContext.clone(mc.getDelivery))
+        _mc.setFailTimes(mc.getFailTimes)
+        _mc.setResponse(mc.getResponse)
+        em.merge(_mc)
+    }
+
+    override def processBatch(): Unit = accept(batch)
 }

@@ -22,7 +22,7 @@ object ConsumerLoggers {
 
     private val APPENDER_NAME = "consumerDispatcherLog"
 
-    private def createLogger(sc: ServerCfg) = {
+    private def createLogger(sc: ServerCfg): Logger = {
         val logFileName: String = sc.getLogFilePath
         val maxLogSize: String = sc.getLogFileSize
         val logName: String = sc.getHost + "/" + sc.getVirtualHost
@@ -58,7 +58,7 @@ object ConsumerLoggers {
             null,
             null)
 
-        xmlCfg.getAppenders.keySet.forEach(xmlCfg.removeAppender)
+        xmlCfg.getAppenders.keySet.forEach(xmlCfg.removeAppender(_))
         xmlCfg.addAppender(__appender)
         lc.getLogger(logName)
     }

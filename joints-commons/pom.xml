@@ -9,7 +9,7 @@
     <version>0.0.1-SNAPSHOT</version>
 
     <properties>
-        <scala-ver>2.12.0</scala-ver>
+        <scala-ver>2.12.1</scala-ver>
     </properties>
 
     <dependencies>
@@ -28,7 +28,7 @@
             <groupId>javax</groupId>
             <artifactId>javaee-web-api</artifactId>
             <version>7.0</version>
-            <scope>${dependency.scope}</scope>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.jboss.weld.environment</groupId>

@@ -152,17 +152,18 @@ private[http] class RespHandler(var mc: MessageContext) extends ResponseHandler[
         }
         mc.setResponse(new MsgResp(resp.getStatusLine.getStatusCode, StringUtils.substring(StringUtils.trimToEmpty(respStr), 0, 2000)))
         MsgMonitor.prefLog(mc, log)
-        Responder.instance(mc.getDelivery.getEnvelope.getDeliveryTag).handover(mc)
+        //        Responder.instance(mc.getDelivery.getEnvelope.getDeliveryTag).handover(mc)
     }
 
     def failed(e: Exception) {
         sw.stop()
         val time = sw.getTime
         val deliveryTag = mc.getDelivery.getEnvelope.getDeliveryTag
-        log.error(String.format("Message: %d failed after %d ms \n getting response from url: \n%s", deliveryTag, time, mc.getQueueCfg.getDestCfg.getUrl), e)
-        mc.setResponse(new MsgResp(MsgResp.FAILED, String.format("{status: %s, resp: '%s', time: %d}", e.getClass.getSimpleName, e.getMessage, time)))
+        //log.error(String.format("Message: %d failed after %d ms \n getting response from url: \n%s", deliveryTag, time, mc.getQueueCfg.getDestCfg.getUrl), e)
+        log.error(s"Message: $deliveryTag failed after $time ms \n getting response from url: \n${mc.getQueueCfg.getDestCfg.getUrl}")
+        mc.setResponse(new MsgResp(MsgResp.FAILED, s"{status: ${e.getClass.getSimpleName}, resp: '${e.getMessage}', time: $time}"))
         MsgMonitor.prefLog(mc, log)
-        Responder.instance(deliveryTag).handover(mc)
+        //        Responder.instance(deliveryTag).handover(mc)
     }
 
     @throws[IOException]

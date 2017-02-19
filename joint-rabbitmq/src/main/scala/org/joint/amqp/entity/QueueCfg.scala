@@ -20,7 +20,7 @@ class QueueCfg extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @BeanProperty
-    var id: Int = -1
+    var id: Integer = -1
 
     @Basic
     @BeanProperty

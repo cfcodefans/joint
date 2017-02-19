@@ -1,7 +1,7 @@
 package org.joints.commons.persistence.jpa.cdi;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.joints.commons.persistence.jpa.JpaModule;
 
 import javax.interceptor.AroundInvoke;
@@ -9,54 +9,96 @@ import javax.interceptor.Interceptor;
 import javax.interceptor.InvocationContext;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityTransaction;
+import java.io.Serializable;
+import java.util.function.BiFunction;
 
 @Transactional
 @Interceptor
 public class TransactionalInterceptor {
 
-	private static final Log	log	= LogFactory.getLog(TransactionalInterceptor.class.getName());
+    private static final Logger log = LogManager.getLogger(TransactionalInterceptor.class);
 
-	@AroundInvoke
-	public Object withTransaction(InvocationContext ctx) throws Throwable {
-		EntityManager em = JpaModule.getEntityManager();
+    public static <P extends Serializable, R extends Serializable> Object withTransaction(BiFunction<EntityManager, P, R> bif, P param) throws Throwable {
+        EntityManager em = JpaModule.getEntityManager();
+        if (em == null) {
+            log.error("failed to get EntityManager");
+            return null;
+        }
 
-		if (em == null) {
-			log.warn("not EntityManager found! \n\t" + ctx.getTarget() + "." + ctx.getMethod());
-			return ctx.proceed();
-		}
+        if (!em.isOpen()) {
+            log.error("not EntityManager Opened! \n\t");
+            return null;
+        }
 
-		if (!em.isOpen()) {
-			log.warn("not EntityManager Opened! \n\t" + ctx.getTarget() + "." + ctx.getMethod());
-			return ctx.proceed();
-		}
+        if (em.isJoinedToTransaction()) {
+            return bif.apply(em, param);
+        }
 
-		if (em.isJoinedToTransaction()) {
-			return ctx.proceed();
-		}
+        final EntityTransaction transaction = em.getTransaction();
+        if (!transaction.isActive()) {
+            transaction.begin();
+        }
+        R returnValue = null;
+        try {
+            returnValue = bif.apply(em, param);
+            // em.flush();
+            transaction.commit();
+            log.info("transaction committed");
+        } catch (Throwable t) {
+            try {
+                if (em.getTransaction().isActive()) {
+                    em.getTransaction().rollback();
+                    log.warn("Rolled back transaction");
+                }
+            } catch (Exception e1) {
+                log.warn("Rollback of transaction failed -> " + e1);
+            }
+            throw t;
+        }
+        return returnValue;
+    }
 
-		final EntityTransaction transaction = em.getTransaction();
+    @AroundInvoke
+    public Object withTransaction(InvocationContext ctx) throws Throwable {
+        EntityManager em = JpaModule.getEntityManager();
 
-		if (!transaction.isActive()) {
-			transaction.begin();
-		}
-		Object returnValue = null;
-		try {
-			returnValue = ctx.proceed();
-			// em.flush();
-			transaction.commit();
-			log.info("transaction committed");
-		} catch (Throwable t) {
-			try {
-				if (em.getTransaction().isActive()) {
-					em.getTransaction().rollback();
-					log.warn("Rolled back transaction");
-				}
-			} catch (Exception e1) {
-				log.warn("Rollback of transaction failed -> " + e1);
-			}
-			throw t;
-		}
+        if (em == null) {
+            log.warn("not EntityManager found! \n\t" + ctx.getTarget() + "." + ctx.getMethod());
+            return ctx.proceed();
+        }
 
-		return returnValue;
-	}
+        if (!em.isOpen()) {
+            log.warn("not EntityManager Opened! \n\t" + ctx.getTarget() + "." + ctx.getMethod());
+            return ctx.proceed();
+        }
+
+        if (em.isJoinedToTransaction()) {
+            return ctx.proceed();
+        }
+
+        final EntityTransaction transaction = em.getTransaction();
+
+        if (!transaction.isActive()) {
+            transaction.begin();
+        }
+        Object returnValue = null;
+        try {
+            returnValue = ctx.proceed();
+            // em.flush();
+            transaction.commit();
+            log.info("transaction committed");
+        } catch (Throwable t) {
+            try {
+                if (em.getTransaction().isActive()) {
+                    em.getTransaction().rollback();
+                    log.warn("Rolled back transaction");
+                }
+            } catch (Exception e1) {
+                log.warn("Rollback of transaction failed -> " + e1);
+            }
+            throw t;
+        }
+
+        return returnValue;
+    }
 }

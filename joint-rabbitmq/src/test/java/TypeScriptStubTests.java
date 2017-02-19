@@ -14,6 +14,5 @@ public class TypeScriptStubTests {
         String src = TypeScriptStubs.classToTypeScriptDef(QueueCfg.class, ctx);
         ctx.classAndTypeSources.entrySet().stream()
             .forEach((Map.Entry<Class, String> en) -> System.out.printf("\n%s -> %s\n", en.getKey(), en.getValue()));
-
     }
 }
