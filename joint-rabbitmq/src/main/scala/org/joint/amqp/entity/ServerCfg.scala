@@ -40,7 +40,7 @@ class ServerCfg extends BaseEntity with Serializable with Supplier[URI] with (()
     var logFilePath: String = null
 
     @BeanProperty
-    var logFileSize: String = "2GB"
+    var maxFileSize: String = "2GB"
 
     override def toString = s"ServerCfg(id=$id, host=$host, port=$port, username=$username, password=$password, virtualHost=$virtualHost, logFilePath=$logFilePath)"
 

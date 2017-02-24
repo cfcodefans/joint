@@ -1,17 +1,18 @@
 package org.joint.amqp
 
-import java.io.IOException
-import java.util.Objects
-import java.util.concurrent.{ExecutorService, Executors}
+import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
+import java.util.{Comparator, Objects}
 
+import akka.actor.{Actor, ActorRef}
 import com.rabbitmq.client._
 import org.apache.logging.log4j.{LogManager, Logger}
 import org.joint.amqp.entity.{MessageContext, QueueCfg, ServerCfg}
 import org.joint.amqp.logging.ConsumerLoggers._
-import org.joint.amqp.manager.MsgMonitor
 import org.joint.failsafe.FailedMessageSqlStorage
-import org.joint.http.HttpDispatcherActor
 import org.joints.commons.MiscUtils
+
+import scala.collection.convert.Wrappers.JConcurrentMapWrapper
+import scala.collection.mutable
 
 /**
   * Created by chenf on 2017/1/6.
@@ -22,32 +23,117 @@ object MQueueMgr {
     protected val log: Logger = LogManager.getLogger(this.getClass)
 
     var NUM_CHANNEL_PER_CONN: Int = 2
+}
 
-    private val EXECUTORS: ExecutorService = Executors.newFixedThreadPool(MiscUtils.AVAILABLE_PROCESSORS * 2,
-        MiscUtils.namedThreadFactory(this.getClass.getSimpleName))
+object ConnFactoryMgr {
+    protected val log: Logger = LogManager.getLogger(this.getClass)
+
+    private val cfgAndConnFactories: JConcurrentMapWrapper[ServerCfg, ConnectionFactory] = JConcurrentMapWrapper[ServerCfg, ConnectionFactory](new ConcurrentHashMap())
 
     def connFactory(sc: ServerCfg): ConnectionFactory = {
         if (sc == null) return null
-        new ConnectionFactory()
+        return cfgAndConnFactories.getOrElseUpdate(sc, createConnFactory(sc))
+    }
+
+    def connFactory(qc: QueueCfg): ConnectionFactory = if (qc != null) connFactory(qc.getServer) else null
+
+    private def createConnFactory(sc: ServerCfg): ConnectionFactory = {
+        val connFactory: ConnectionFactory = new ConnectionFactory()
+        connFactory.setHost(sc.getHost)
+        connFactory.setPort(sc.getPort)
+        connFactory.setUsername(sc.getUsername)
+        connFactory.setPassword(sc.getPassword)
+        connFactory.setVirtualHost(sc.getVirtualHost)
+        connFactory.setAutomaticRecoveryEnabled(true)
+
+        return connFactory
+    }
+
+    def updateConnFactory(sc: ServerCfg): ConnectionFactory = {
+        if (sc == null) return null
+        return cfgAndConnFactories.replace(sc, createConnFactory(sc)).get
+    }
+
+    def removeConnFactory(sc: ServerCfg): ConnectionFactory = cfgAndConnFactories.remove(sc).get
+}
+
+object ConnectionMgr {
+    protected val log: Logger = LogManager.getLogger(this.getClass)
+
+    private val EXECUTORS: ExecutorService = Executors.newFixedThreadPool(
+        MiscUtils.AVAILABLE_PROCESSORS * 2,
+        MiscUtils.namedThreadFactory(this.getClass.getSimpleName))
+
+    private[amqp] val serverCfgAndNamedConnections: mutable.Map[QueueCfg, NamedConnectionWrapper] =
+        JConcurrentMapWrapper[QueueCfg, NamedConnectionWrapper](new ConcurrentHashMap())
+
+    def createConn(qc: QueueCfg): NamedConnectionWrapper = {
+        if (qc == null) return null
+        val cf: ConnectionFactory = ConnFactoryMgr.connFactory(qc)
+        if (cf == null) {
+            log.error(s"failed to get ConnectionFactory for ServerCfg:\n\t$qc")
+            return null
+        }
+
+        val connName: String = s"conn-${qc.getServer.get().toASCIIString}"
+        val conn: RecoverableConnection = cf.newConnection(EXECUTORS, connName).asInstanceOf[RecoverableConnection]
+        val named: NamedConnectionWrapper = new NamedConnectionWrapper(connName: String, conn, qc.getServer)
+
+        conn.addShutdownListener(named)
+        conn.addRecoveryListener(named)
+        conn.addBlockedListener(named)
+
+        return named
+    }
+
+    def getConn(sc: QueueCfg): NamedConnectionWrapper = {
+        return
     }
 }
 
-object ConsumerActor {
-    protected val log: Logger = LogManager.getLogger(classOf[ConsumerActor])
-}
+class NamedConnectionWrapper(val name: String,
+                             val conn: RecoverableConnection,
+                             val sc: ServerCfg,
+                             val queueCfgs: mutable.Set[QueueCfg] = mutable.Set.empty)
+    extends ShutdownListener
+        with RecoveryListener
+        with BlockedListener
+        with Comparable[NamedConnectionWrapper] {
 
-class ConsumerActor(val ch: Channel, val queueCfg: QueueCfg) extends DefaultConsumer(ch) {
-    @throws[IOException]
-    override def handleDelivery(consumerTag: String, envelope: Envelope, properties: AMQP.BasicProperties, body: Array[Byte]) {
-        val d = new QueueingConsumer.Delivery(envelope, properties, body)
-        val mc = new MessageContext(queueCfg, d)
-        val sc = queueCfg.getServer
-        _info(sc, "get message: " + d.getEnvelope.getDeliveryTag + " for q: " + queueCfg.getName + " on server " + sc.getVirtualHost)
-        // TODO use injection to decouple dependency
-        MsgMonitor._actor.!(mc)
-        HttpDispatcherActor.instance.accept(mc)
+    def canEqual(other: Any): Boolean = other.isInstanceOf[NamedConnectionWrapper]
+
+    override def equals(other: Any): Boolean = other match {
+        case that: NamedConnectionWrapper => (that canEqual this) && name == that.name && sc == that.sc
+        case _ => false
+    }
+
+    override def hashCode(): Int = {
+        return Objects.hash(name, sc)
+    }
+
+    override def compareTo(o: NamedConnectionWrapper): Int = Objects.compare(name, o.name, Comparator.naturalOrder())
+
+    override def shutdownCompleted(cause: ShutdownSignalException): Unit = {
+
+    }
+
+    override def handleRecovery(recoverable: Recoverable): Unit = {
+
+    }
+
+    override def handleRecoveryStarted(recoverable: Recoverable): Unit = {
+
+    }
+
+    override def handleUnblocked(): Unit = {
+
+    }
+
+    override def handleBlocked(reason: String): Unit = {
+
     }
 }
+
 
 object QueueCtx {
     val log: Logger = LogManager.getLogger(classOf[QueueCtx])
@@ -80,7 +166,7 @@ class QueueCtx(val _ch: Channel, val _queueCfg: QueueCfg) extends ShutdownListen
         if (reason.isInstanceOf[AMQP.Connection.Close]) {
             val close = reason.asInstanceOf[AMQP.Connection.Close]
             if (AMQP.CONNECTION_FORCED == close.getReplyCode && "OK" == close.getReplyText) {
-                val infoStr = String.format("\n close connection to server: \n\t %s", sc)
+                val infoStr = s"\n close connection to server: \n\t ${sc}"
                 log.error(infoStr)
                 _info(sc, infoStr)
                 return
@@ -89,14 +175,14 @@ class QueueCtx(val _ch: Channel, val _queueCfg: QueueCfg) extends ShutdownListen
         if (reason.isInstanceOf[AMQP.Channel.Close]) {
             val close = reason.asInstanceOf[AMQP.Channel.Close]
             if (AMQP.CONNECTION_FORCED == close.getReplyCode && "OK" == close.getReplyText) {
-                val infoStr = String.format("\n close channel to server: \n\t %s", sc)
+                val infoStr = s"\n close channel to server: \n\t ${sc}"
                 log.error(infoStr)
                 _info(sc, infoStr)
                 return
             }
         }
         if (cause.isHardError) {
-            val infoStr = String.format("\n unexpected shutdown on connection to server: \n\t %s \n\n\t", sc, cause.getCause)
+            val infoStr = s"\n unexpected shutdown on connection to server: \n\t ${sc} \n\n\t${cause.getMessage}"
             log.error(infoStr)
             _info(sc, infoStr)
             return
@@ -107,6 +193,22 @@ class QueueCtx(val _ch: Channel, val _queueCfg: QueueCfg) extends ShutdownListen
 
 object Responder {
     protected val log: Logger = LogManager.getLogger(this.getClass)
-    private val failsafe = FailedMessageSqlStorage.instance
+    private val failsafe: ActorRef = FailedMessageSqlStorage.instance
+    private val executor: ExecutorService = Executors.newFixedThreadPool(MiscUtils.AVAILABLE_PROCESSORS, MiscUtils.namedThreadFactory("Responder"))
+
+    override def finalize(): Unit = {
+        executor.shutdownNow()
+        super.finalize()
+    }
+}
+
+class Responder extends Actor {
+    override def receive: Receive = {
+        case (mc: MessageContext) => {
+            if (mc.isSucceeded) {
+
+            }
+        }
+    }
 }
 

@@ -24,7 +24,7 @@ object ConsumerLoggers {
 
     private def createLogger(sc: ServerCfg): Logger = {
         val logFileName: String = sc.getLogFilePath
-        val maxLogSize: String = sc.getLogFileSize
+        val maxLogSize: String = sc.getMaxFileSize
         val logName: String = sc.getHost + "/" + sc.getVirtualHost
         val context: LoggerContext = LogManager.getContext.asInstanceOf[LoggerContext]
         val cfgSrc = context.getConfiguration.getConfigurationSource

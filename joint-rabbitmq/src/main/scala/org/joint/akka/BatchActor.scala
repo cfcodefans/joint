@@ -27,15 +27,14 @@ object BatchActor {
 import org.joint.akka.BatchActor._
 
 class BatchActor[M <: java.io.Serializable](val timeout: FiniteDuration = 1.millisecond,
-                                            val batchSize: Int = 10,
-                                            val batch: util.LinkedList[M] = new util.LinkedList[M]()) extends FSM[State, util.Collection[M]] {
-    startWith(Idle, batch, Option(timeout))
+                                            val batchSize: Int = 10) extends FSM[State, util.Collection[M]] {
+    startWith(Idle, new util.ArrayList[M](batchSize), Option(timeout))
 
     onTransition({
         case (transition: (BatchActor.State, BatchActor.State)) => log.info(s"${transition._1} => ${transition._2}")
     })
 
-    def processBatch(): Unit = {
+    def processBatch(batch: util.Collection[M]): Unit = {
         if (CollectionUtils.isEmpty(batch)) return
         log.info(batch.asScala.mkString("\n\t", ", ", "\n"))
         batch.clear()
@@ -43,11 +42,11 @@ class BatchActor[M <: java.io.Serializable](val timeout: FiniteDuration = 1.mill
 
     when(Idle, timeout) {
         case ev@Event(StateTimeout, _batch: util.Collection[M]) => {
-            processBatch()
+            processBatch(_batch)
             stay()
         }
         case ev@Event(msg: M, _batch: util.Collection[M]) => {
-            batch.add(msg)
+            _batch.add(msg)
             goto(Active)
         }
         case ev@_ => {
@@ -58,13 +57,13 @@ class BatchActor[M <: java.io.Serializable](val timeout: FiniteDuration = 1.mill
 
     when(Active, timeout) {
         case ev@Event(StateTimeout, _batch: util.Collection[M]) => {
-            processBatch()
+            processBatch(_batch)
             goto(Idle).using(_batch)
         }
         case ev@Event(msg: M, _batch: util.Collection[M]) => {
             _batch.add(msg)
-            if (batch.size() >= batchSize) {
-                processBatch()
+            if (_batch.size() >= batchSize) {
+                processBatch(_batch)
             }
             stay()
         }

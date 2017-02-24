@@ -18,7 +18,7 @@ public class TransactionalInterceptor {
 
     private static final Logger log = LogManager.getLogger(TransactionalInterceptor.class);
 
-    public static <P extends Serializable, R extends Serializable> Object withTransaction(BiFunction<EntityManager, P, R> bif, P param) throws Throwable {
+    public static <P, R> Object withTransaction(BiFunction<EntityManager, P, R> bif, P param) throws Throwable {
         EntityManager em = JpaModule.getEntityManager();
         if (em == null) {
             log.error("failed to get EntityManager");

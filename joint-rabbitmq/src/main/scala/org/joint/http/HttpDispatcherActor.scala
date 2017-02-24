@@ -159,7 +159,6 @@ private[http] class RespHandler(var mc: MessageContext) extends ResponseHandler[
         sw.stop()
         val time = sw.getTime
         val deliveryTag = mc.getDelivery.getEnvelope.getDeliveryTag
-        //log.error(String.format("Message: %d failed after %d ms \n getting response from url: \n%s", deliveryTag, time, mc.getQueueCfg.getDestCfg.getUrl), e)
         log.error(s"Message: $deliveryTag failed after $time ms \n getting response from url: \n${mc.getQueueCfg.getDestCfg.getUrl}")
         mc.setResponse(new MsgResp(MsgResp.FAILED, s"{status: ${e.getClass.getSimpleName}, resp: '${e.getMessage}', time: $time}"))
         MsgMonitor.prefLog(mc, log)
