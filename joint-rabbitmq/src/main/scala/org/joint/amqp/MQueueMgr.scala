@@ -86,8 +86,9 @@ object ConnectionMgr {
         return named
     }
 
-    def getConn(sc: QueueCfg): NamedConnectionWrapper = {
-        return
+    def getConn(qc: QueueCfg): NamedConnectionWrapper = {
+        if (qc == null) return null
+        return serverCfgAndNamedConnections.getOrElseUpdate(qc, createConn(qc))
     }
 }
 
