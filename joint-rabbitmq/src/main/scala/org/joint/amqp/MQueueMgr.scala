@@ -18,7 +18,7 @@ import scala.collection.mutable
   * Created by chenf on 2017/1/6.
   */
 object MQueueMgr {
-    def stopQueue(qc: QueueCfg) = ???
+    //    def stopQueue(qc: QueueCfg) = ???
 
     protected val log: Logger = LogManager.getLogger(this.getClass)
 
@@ -58,7 +58,7 @@ object ConnFactoryMgr {
 }
 
 object ConnectionMgr {
-    protected val log: Logger = LogManager.getLogger(this.getClass)
+    protected[amqp] val log: Logger = LogManager.getLogger(this.getClass)
 
     private val EXECUTORS: ExecutorService = Executors.newFixedThreadPool(
         MiscUtils.AVAILABLE_PROCESSORS * 2,
@@ -86,10 +86,7 @@ object ConnectionMgr {
         return named
     }
 
-    def getConn(qc: QueueCfg): NamedConnectionWrapper = {
-        if (qc == null) return null
-        return serverCfgAndNamedConnections.getOrElseUpdate(qc, createConn(qc))
-    }
+    def getConn(qc: QueueCfg): NamedConnectionWrapper = if (qc == null) null else serverCfgAndNamedConnections.getOrElseUpdate(qc, createConn(qc))
 }
 
 class NamedConnectionWrapper(val name: String,
@@ -100,6 +97,8 @@ class NamedConnectionWrapper(val name: String,
         with RecoveryListener
         with BlockedListener
         with Comparable[NamedConnectionWrapper] {
+
+    import ConnectionMgr._
 
     def canEqual(other: Any): Boolean = other.isInstanceOf[NamedConnectionWrapper]
 
@@ -115,7 +114,20 @@ class NamedConnectionWrapper(val name: String,
     override def compareTo(o: NamedConnectionWrapper): Int = Objects.compare(name, o.name, Comparator.naturalOrder())
 
     override def shutdownCompleted(cause: ShutdownSignalException): Unit = {
+        val reason: Object = cause.getReason
 
+        reason match {
+            case (close: AMQP.Connection.Close) => {
+                if (AMQP.CONNECTION_FORCED == close.getReplyCode && "OK" == close.getReplyText) {
+                    val infoStr = s"\n force to close connection to server: \n\t ${sc}"
+                    log.error(infoStr)
+                    _info(sc, infoStr)
+                }
+            }
+            case (unknown: _) => {
+                log.error(s"$unknown happened to connection to server: \n\t $sc")
+            }
+        }
     }
 
     override def handleRecovery(recoverable: Recoverable): Unit = {
@@ -188,7 +200,7 @@ class QueueCtx(val _ch: Channel, val _queueCfg: QueueCfg) extends ShutdownListen
             _info(sc, infoStr)
             return
         }
-        MQueueMgr.stopQueue(qc)
+        //        MQueueMgr.stopQueue(qc)
     }
 }
 
