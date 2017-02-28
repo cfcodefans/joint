@@ -5,6 +5,7 @@ import java.util.{Comparator, Objects}
 
 import akka.actor.{Actor, ActorRef}
 import com.rabbitmq.client._
+import com.rabbitmq.client.impl.nio.NioParams
 import org.apache.logging.log4j.{LogManager, Logger}
 import org.joint.amqp.entity.{MessageContext, QueueCfg, ServerCfg}
 import org.joint.amqp.logging.ConsumerLoggers._
@@ -23,12 +24,15 @@ object MQueueMgr {
     protected val log: Logger = LogManager.getLogger(this.getClass)
 
     var NUM_CHANNEL_PER_CONN: Int = 2
+
+
 }
 
 object ConnFactoryMgr {
     protected val log: Logger = LogManager.getLogger(this.getClass)
 
-    private val cfgAndConnFactories: JConcurrentMapWrapper[ServerCfg, ConnectionFactory] = JConcurrentMapWrapper[ServerCfg, ConnectionFactory](new ConcurrentHashMap())
+    private val cfgAndConnFactories: collection.concurrent.Map[ServerCfg, ConnectionFactory] =
+        JConcurrentMapWrapper[ServerCfg, ConnectionFactory](new ConcurrentHashMap())
 
     def connFactory(sc: ServerCfg): ConnectionFactory = {
         if (sc == null) return null
@@ -45,6 +49,11 @@ object ConnFactoryMgr {
         connFactory.setPassword(sc.getPassword)
         connFactory.setVirtualHost(sc.getVirtualHost)
         connFactory.setAutomaticRecoveryEnabled(true)
+        connFactory.useNio()
+
+        val nioParams: NioParams = new NioParams()
+        nioParams.setNbIoThreads(Math.min(MiscUtils.AVAILABLE_PROCESSORS / 2, 2))
+        connFactory.setNioParams(nioParams)
 
         return connFactory
     }
@@ -64,10 +73,10 @@ object ConnectionMgr {
         MiscUtils.AVAILABLE_PROCESSORS * 2,
         MiscUtils.namedThreadFactory(this.getClass.getSimpleName))
 
-    private[amqp] val serverCfgAndNamedConnections: mutable.Map[QueueCfg, NamedConnectionWrapper] =
-        JConcurrentMapWrapper[QueueCfg, NamedConnectionWrapper](new ConcurrentHashMap())
+    private[amqp] val serverCfgAndNamedConnections: collection.concurrent.Map[QueueCfg, NamedConnectionActor] =
+        JConcurrentMapWrapper[QueueCfg, NamedConnectionActor](new ConcurrentHashMap())
 
-    def createConn(qc: QueueCfg): NamedConnectionWrapper = {
+    def createConn(qc: QueueCfg): NamedConnectionActor = {
         if (qc == null) return null
         val cf: ConnectionFactory = ConnFactoryMgr.connFactory(qc)
         if (cf == null) {
@@ -77,7 +86,7 @@ object ConnectionMgr {
 
         val connName: String = s"conn-${qc.getServer.get().toASCIIString}"
         val conn: RecoverableConnection = cf.newConnection(EXECUTORS, connName).asInstanceOf[RecoverableConnection]
-        val named: NamedConnectionWrapper = new NamedConnectionWrapper(connName: String, conn, qc.getServer)
+        val named: NamedConnectionActor = new NamedConnectionActor(connName: String, conn, qc.getServer)
 
         conn.addShutdownListener(named)
         conn.addRecoveryListener(named)
@@ -86,24 +95,25 @@ object ConnectionMgr {
         return named
     }
 
-    def getConn(qc: QueueCfg): NamedConnectionWrapper = if (qc == null) null else serverCfgAndNamedConnections.getOrElseUpdate(qc, createConn(qc))
+    def getConn(qc: QueueCfg): NamedConnectionActor = if (qc == null) null else serverCfgAndNamedConnections.getOrElseUpdate(qc, createConn(qc))
 }
 
-class NamedConnectionWrapper(val name: String,
-                             val conn: RecoverableConnection,
-                             val sc: ServerCfg,
-                             val queueCfgs: mutable.Set[QueueCfg] = mutable.Set.empty)
-    extends ShutdownListener
+class NamedConnectionActor(val name: String,
+                           val conn: RecoverableConnection,
+                           val sc: ServerCfg,
+                           val queueCfgs: mutable.Set[QueueCfg] = mutable.Set.empty)
+    extends Actor
+        with ShutdownListener
         with RecoveryListener
         with BlockedListener
-        with Comparable[NamedConnectionWrapper] {
+        with Comparable[NamedConnectionActor] {
 
     import ConnectionMgr._
 
-    def canEqual(other: Any): Boolean = other.isInstanceOf[NamedConnectionWrapper]
+    def canEqual(other: Any): Boolean = other.isInstanceOf[NamedConnectionActor]
 
     override def equals(other: Any): Boolean = other match {
-        case that: NamedConnectionWrapper => (that canEqual this) && name == that.name && sc == that.sc
+        case that: NamedConnectionActor => (that canEqual this) && name == that.name && sc == that.sc
         case _ => false
     }
 
@@ -111,7 +121,7 @@ class NamedConnectionWrapper(val name: String,
         return Objects.hash(name, sc)
     }
 
-    override def compareTo(o: NamedConnectionWrapper): Int = Objects.compare(name, o.name, Comparator.naturalOrder())
+    override def compareTo(o: NamedConnectionActor): Int = Objects.compare(name, o.name, Comparator.naturalOrder())
 
     override def shutdownCompleted(cause: ShutdownSignalException): Unit = {
         val reason: Object = cause.getReason
@@ -125,17 +135,17 @@ class NamedConnectionWrapper(val name: String,
                 }
             }
             case (unknown: _) => {
-                log.error(s"$unknown happened to connection to server: \n\t $sc")
+                log.error(s"$unknown closed connection to server: \n\t $sc")
             }
         }
     }
 
     override def handleRecovery(recoverable: Recoverable): Unit = {
-
+        log.info(s"connection: $name to server \n\t $sc is recovered")
     }
 
     override def handleRecoveryStarted(recoverable: Recoverable): Unit = {
-
+        log.info(s"connection: $name to server \n\t $sc is being recovered")
     }
 
     override def handleUnblocked(): Unit = {
@@ -143,6 +153,10 @@ class NamedConnectionWrapper(val name: String,
     }
 
     override def handleBlocked(reason: String): Unit = {
+
+    }
+
+    override def receive: Receive = {
 
     }
 }

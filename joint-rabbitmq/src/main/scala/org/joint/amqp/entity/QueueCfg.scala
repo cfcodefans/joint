@@ -15,7 +15,7 @@ import scala.beans.{BeanProperty, BooleanBeanProperty}
 @Entity
 @Table(name = "queue_cfg")
 @Cacheable(false)
-class QueueCfg extends BaseEntity {
+class QueueCfg extends BaseCfg {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

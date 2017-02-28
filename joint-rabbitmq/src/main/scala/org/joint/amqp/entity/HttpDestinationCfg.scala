@@ -15,7 +15,7 @@ import scala.beans.BeanProperty
 @Entity
 @Table(name = "dest_cfg")
 @Cacheable(true)
-class HttpDestinationCfg extends BaseEntity with Supplier[URI] with Function0[URI] {
+class HttpDestinationCfg extends BaseCfg with Supplier[URI] with Function0[URI] {
     @Basic
     @BeanProperty
     var hostHead: String = null

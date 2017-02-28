@@ -15,7 +15,7 @@ import scala.beans.BeanProperty
 @Entity
 @Table(name = "server_cfg")
 @Cacheable(false)
-class ServerCfg extends BaseEntity with Serializable with Supplier[URI] with (() => URI) {
+class ServerCfg extends BaseCfg with Serializable with Supplier[URI] with (() => URI) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @BeanProperty

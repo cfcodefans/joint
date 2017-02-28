@@ -15,7 +15,7 @@ import scala.beans.{BeanProperty, BooleanBeanProperty}
 @Entity
 @Table(name = "exchange_cfg")
 @Cacheable(false)
-class ExchangeCfg extends BaseEntity {
+class ExchangeCfg extends BaseCfg {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @BeanProperty
