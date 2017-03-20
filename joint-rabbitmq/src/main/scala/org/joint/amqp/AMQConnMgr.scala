@@ -1,7 +1,7 @@
 package org.joint.amqp
 
+import java.util.Objects
 import java.util.concurrent.{ConcurrentHashMap, Executors}
-import java.util.{Comparator, Objects}
 
 import com.rabbitmq.client._
 import com.rabbitmq.client.impl.nio.NioParams
@@ -22,14 +22,15 @@ object AMQConnMgr {
         JConcurrentMapWrapper[ServerCfg, ConnContext](new ConcurrentHashMap())
 
     def connCtx(sc: ServerCfg): ConnContext = synchronized({
-        if (sc == null) null else cfgAndConnCtxs.getOrElseUpdate(sc, new ConnContext(_sc = sc))
+        if (sc == null) null else cfgAndConnCtxs.getOrElseUpdate(sc, new ConnContext(sc))
     })
 
     def updateConnCtx(sc: ServerCfg): ConnContext = synchronized({
         val oldConnCtx: ConnContext = cfgAndConnCtxs(sc)
         if (oldConnCtx == null) return connCtx(sc)
         val newConnCtx: ConnContext = connCtx(sc)
-        return newConnCtx.consumeForQueues(oldConnCtx.cfgAndChannels.keys)
+        newConnCtx.consumeForQueues(oldConnCtx.cfgAndChannels.keys)
+        return newConnCtx
     })
 
     def deleteConnCtx(sc: ServerCfg): ConnContext = synchronized({
@@ -61,7 +62,6 @@ object AMQConnMgr {
 protected[amqp] class ConnContext(val sc: ServerCfg) extends ShutdownListener
     with RecoveryListener
     with BlockedListener
-    with Comparable[NamedConnectionActor]
     with AutoCloseable {
 
     import AMQConnMgr._
@@ -78,19 +78,18 @@ protected[amqp] class ConnContext(val sc: ServerCfg) extends ShutdownListener
 
     def consumeForQueue(qc: QueueCfg): QueueCfg = {
         if (qc == null || !qc.isEnabled) return qc
-
+        return qc
     }
 
-    def this(_sc: ServerCfg) {
-        this(_sc)
+    {
         this.connFactory = createConnFactory(sc)
         this.conn = connFactory.newConnection(Executors.newSingleThreadExecutor(), s"conn-${sc.get()}").asInstanceOf
     }
 
-    def canEqual(other: Any): Boolean = other.isInstanceOf[NamedConnectionActor]
+    def canEqual(other: Any): Boolean = other.isInstanceOf[ConnectionWrapper]
 
     override def equals(other: Any): Boolean = other match {
-        case that: NamedConnectionActor => (that canEqual this) && sc == that.sc
+        case that: ConnectionWrapper => (that canEqual this) && sc == that.sc
         case _ => false
     }
 
@@ -98,20 +97,18 @@ protected[amqp] class ConnContext(val sc: ServerCfg) extends ShutdownListener
         return Objects.hash(sc)
     }
 
-    override def compareTo(o: NamedConnectionActor): Int = Objects.compare(sc, o.sc, Comparator.naturalOrder())
-
     override def shutdownCompleted(cause: ShutdownSignalException): Unit = {
         val reason: Object = cause.getReason
 
         reason match {
             case (close: AMQP.Connection.Close) => {
                 if (AMQP.CONNECTION_FORCED == close.getReplyCode && "OK" == close.getReplyText) {
-                    val infoStr = s"\n force to close connection: to server: \n\t ${sc}"
+                    val infoStr = s"\n force to close connection: to server: \n\t $sc"
                     log.error(infoStr)
                     _info(sc, infoStr)
                 }
             }
-            case (unknown: _) => {
+            case unknown@_ => {
                 log.error(s"$unknown closed connection to server: \n\t $sc")
             }
         }

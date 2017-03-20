@@ -48,9 +48,11 @@ class ServerCfg extends BaseCfg with Serializable with Supplier[URI] with (() =>
 
     override def equals(other: Any): Boolean = other match {
         case that: ServerCfg => {
-            if (this.id != -1 && this.getId == that.getId) true
+            if (this.id != -1 && this.getId == that.getId) {
+                return true
+            }
 
-            (that canEqual this) &&
+            return (that canEqual this) &&
                 host == that.host &&
                 port == that.port &&
                 username == that.username &&

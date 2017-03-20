@@ -152,7 +152,10 @@ private[http] class RespHandler(var mc: MessageContext) extends ResponseHandler[
         }
         mc.setResponse(new MsgResp(resp.getStatusLine.getStatusCode, StringUtils.substring(StringUtils.trimToEmpty(respStr), 0, 2000)))
         MsgMonitor.prefLog(mc, log)
-        //        Responder.instance(mc.getDelivery.getEnvelope.getDeliveryTag).handover(mc)
+        if (mc.getResponse.statusCode >= 400 || !mc.isSucceeded) {
+            mc.fail
+        }
+        //TODO responder
     }
 
     def failed(e: Exception) {
@@ -162,7 +165,8 @@ private[http] class RespHandler(var mc: MessageContext) extends ResponseHandler[
         log.error(s"Message: $deliveryTag failed after $time ms \n getting response from url: \n${mc.getQueueCfg.getDestCfg.getUrl}")
         mc.setResponse(new MsgResp(MsgResp.FAILED, s"{status: ${e.getClass.getSimpleName}, resp: '${e.getMessage}', time: $time}"))
         MsgMonitor.prefLog(mc, log)
-        //        Responder.instance(deliveryTag).handover(mc)
+        mc.fail
+        //TODO responder
     }
 
     @throws[IOException]
