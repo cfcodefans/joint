@@ -24,10 +24,14 @@ import scala.concurrent.duration._
 object FailedMessageSqlStorage {
     protected val log: Logger = LogManager.getLogger(classOf[FailedMessageSqlStorage])
 
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor(MiscUtils.namedThreadFactory(classOf[FailedMessageSqlStorage].getSimpleName))
+    private val executor: ExecutorService = Executors.newSingleThreadExecutor(
+        MiscUtils.namedThreadFactory(classOf[FailedMessageSqlStorage].getSimpleName))
+
     private val system: ActorSystem = ActorSystem(name = classOf[FailedMessageSqlStorage].getSimpleName,
         defaultExecutionContext = Option(ExecutionContext.fromExecutorService(executor)))
+
     lazy val instance: ActorRef = system.actorOf(Props[FailedMessageSqlStorage](new FailedMessageSqlStorage))
+
     private val batchSize: Int = 100
     private val batchInterval: Long = 1
 }

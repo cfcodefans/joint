@@ -40,7 +40,8 @@ class QueueCfg extends BaseCfg {
 
     @Basic
     @Column(name = "prefetch_size")
-    var prefetchSize: Int = 0
+    @BeanProperty
+    var preferFetchSize: Int = 0
 
     @Column(name = "retry_limit")
     @BeanProperty

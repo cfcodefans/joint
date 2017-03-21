@@ -6,20 +6,21 @@ import java.util.{Comparator, Objects}
 import akka.actor.{Actor, ActorRef}
 import com.rabbitmq.client._
 import com.rabbitmq.client.impl.nio.NioParams
+import org.apache.commons.lang3.StringUtils
 import org.apache.logging.log4j.{LogManager, Logger}
 import org.joint.amqp.entity.{MessageContext, QueueCfg, ServerCfg}
 import org.joint.amqp.logging.ConsumerLoggers._
 import org.joint.failsafe.FailedMessageSqlStorage
 import org.joints.commons.MiscUtils
 
+import scala.collection.JavaConverters._
 import scala.collection.convert.Wrappers.JConcurrentMapWrapper
-import scala.collection.mutable
 
 /**
   * Created by chenf on 2017/1/6.
   */
 object MQueueMgr {
-    //    def stopQueue(qc: QueueCfg) = ???
+    //    def stopQueue(sc: QueueCfg) = ???
 
     protected val log: Logger = LogManager.getLogger(this.getClass)
 
@@ -39,7 +40,13 @@ object ConnFactoryMgr {
         return cfgAndConnFactories.getOrElseUpdate(sc, createConnFactory(sc))
     }
 
-    def connFactory(qc: QueueCfg): ConnectionFactory = if (qc != null) connFactory(qc.getServer) else null
+    def updateConnFactory(sc: ServerCfg): ConnectionFactory = synchronized({
+        if (sc == null) return null
+        ConnectionMgr.closeConnBy(sc)
+        val newFactory: ConnectionFactory = cfgAndConnFactories.replace(sc, createConnFactory(sc)).get
+        ConnectionMgr.openConnFor(sc)
+        return newFactory
+    })
 
     private def createConnFactory(sc: ServerCfg): ConnectionFactory = {
         val connFactory: ConnectionFactory = new ConnectionFactory()
@@ -58,35 +65,49 @@ object ConnFactoryMgr {
         return connFactory
     }
 
-    def updateConnFactory(sc: ServerCfg): ConnectionFactory = {
-        if (sc == null) return null
-        return cfgAndConnFactories.replace(sc, createConnFactory(sc)).get
+    def removeConnFactory(sc: ServerCfg): ConnectionFactory = {
+        ConnectionMgr.closeConnBy(sc)
+        return cfgAndConnFactories.remove(sc).get
     }
-
-    def removeConnFactory(sc: ServerCfg): ConnectionFactory = cfgAndConnFactories.remove(sc).get
 }
 
 object ConnectionMgr {
     protected[amqp] val log: Logger = LogManager.getLogger(this.getClass)
+    private[amqp] val serverCfgAndNamedConnections: collection.concurrent.Map[ServerCfg, ConnectionWrapper] =
+        JConcurrentMapWrapper[ServerCfg, ConnectionWrapper](new ConcurrentHashMap())
 
-    private val EXECUTORS: ExecutorService = Executors.newFixedThreadPool(
-        MiscUtils.AVAILABLE_PROCESSORS * 2,
-        MiscUtils.namedThreadFactory(this.getClass.getSimpleName))
+    def closeConnBy(sc: ServerCfg): ConnectionWrapper = synchronized({
+        return serverCfgAndNamedConnections.remove(sc).map(cw => {
+            cw.conn.close(AMQP.CONNECTION_FORCED, "OK")
+            cw
+        }).get
+    })
 
-    private[amqp] val serverCfgAndNamedConnections: collection.concurrent.Map[QueueCfg, NamedConnectionActor] =
-        JConcurrentMapWrapper[QueueCfg, NamedConnectionActor](new ConcurrentHashMap())
+    def openConnFor(sc: ServerCfg): ConnectionWrapper = synchronized({
+        val cf: ConnectionFactory = ConnFactoryMgr.connFactory(sc)
+        val connWrapper: ConnectionWrapper = getOrCreateConnection(sc)
+        connWrapper.conn = cf.newConnection(getExecutorsForConn, connWrapper.name).asInstanceOf[RecoverableConnection]
+        connWrapper.conn.addShutdownListener(connWrapper)
+        connWrapper.conn.addRecoveryListener(connWrapper)
+        connWrapper.conn.addBlockedListener(connWrapper)
+        return connWrapper
+    })
 
-    def createConn(qc: QueueCfg): NamedConnectionActor = {
-        if (qc == null) return null
-        val cf: ConnectionFactory = ConnFactoryMgr.connFactory(qc)
+    def getOrCreateConnection(sc: ServerCfg): ConnectionWrapper = {
+        return if (sc == null) null else serverCfgAndNamedConnections.getOrElseUpdate(sc, createConn(sc))
+    }
+
+    def createConn(sc: ServerCfg): ConnectionWrapper = {
+        if (sc == null) return null
+        val cf: ConnectionFactory = ConnFactoryMgr.connFactory(sc)
         if (cf == null) {
-            log.error(s"failed to get ConnectionFactory for ServerCfg:\n\t$qc")
+            log.error(s"failed to get ConnectionFactory for ServerCfg:\n\t$sc")
             return null
         }
 
-        val connName: String = s"conn-${qc.getServer.get().toASCIIString}"
-        val conn: RecoverableConnection = cf.newConnection(EXECUTORS, connName).asInstanceOf[RecoverableConnection]
-        val named: NamedConnectionActor = new NamedConnectionActor(connName: String, conn, qc.getServer)
+        val connName: String = s"conn-${sc.get().toASCIIString}"
+        val conn: RecoverableConnection = cf.newConnection(getExecutorsForConn, connName).asInstanceOf[RecoverableConnection]
+        val named: ConnectionWrapper = new ConnectionWrapper(connName, conn, sc)
 
         conn.addShutdownListener(named)
         conn.addRecoveryListener(named)
@@ -95,33 +116,37 @@ object ConnectionMgr {
         return named
     }
 
-    def getConn(qc: QueueCfg): NamedConnectionActor = if (qc == null) null else serverCfgAndNamedConnections.getOrElseUpdate(qc, createConn(qc))
+    private def getExecutorsForConn: ExecutorService = {
+        return Executors.newFixedThreadPool(
+            MiscUtils.AVAILABLE_PROCESSORS * 2,
+            MiscUtils.namedThreadFactory(this.getClass.getSimpleName))
+    }
 }
 
-class NamedConnectionActor(val name: String,
-                           val conn: RecoverableConnection,
-                           val sc: ServerCfg,
-                           val queueCfgs: mutable.Set[QueueCfg] = mutable.Set.empty)
-    extends Actor
-        with ShutdownListener
-        with RecoveryListener
-        with BlockedListener
-        with Comparable[NamedConnectionActor] {
+class ConnectionWrapper(val name: String,
+                        var conn: RecoverableConnection,
+                        var sc: ServerCfg) extends Actor
+    with ShutdownListener
+    with RecoveryListener
+    with BlockedListener
+    with Comparable[ConnectionWrapper] {
 
     import ConnectionMgr._
 
-    def canEqual(other: Any): Boolean = other.isInstanceOf[NamedConnectionActor]
-
     override def equals(other: Any): Boolean = other match {
-        case that: NamedConnectionActor => (that canEqual this) && name == that.name && sc == that.sc
+        case that: ConnectionWrapper => (that canEqual this) && name == that.name && sc == that.sc
         case _ => false
     }
+
+    def canEqual(other: Any): Boolean = other.isInstanceOf[ConnectionWrapper]
 
     override def hashCode(): Int = {
         return Objects.hash(name, sc)
     }
 
-    override def compareTo(o: NamedConnectionActor): Int = Objects.compare(name, o.name, Comparator.naturalOrder())
+    override def compareTo(o: ConnectionWrapper): Int = {
+        return Objects.compare[String](name, o.name, Comparator.naturalOrder())
+    }
 
     override def shutdownCompleted(cause: ShutdownSignalException): Unit = {
         val reason: Object = cause.getReason
@@ -134,7 +159,7 @@ class NamedConnectionActor(val name: String,
                     _info(sc, infoStr)
                 }
             }
-            case (unknown: _) => {
+            case unknown@_ => {
                 log.error(s"$unknown closed connection to server: \n\t $sc")
             }
         }
@@ -156,14 +181,52 @@ class NamedConnectionActor(val name: String,
 
     }
 
-    override def receive: Receive = {
-
-    }
+    override def receive: Receive = ???
 }
 
 
 object QueueCtx {
     val log: Logger = LogManager.getLogger(classOf[QueueCtx])
+
+    private[amqp] val queueCfgAndCtxs: collection.concurrent.Map[QueueCfg, QueueCtx] =
+        JConcurrentMapWrapper[QueueCfg, QueueCtx](new ConcurrentHashMap())
+
+    def getOrCreateQueueCtx(qc: QueueCfg): QueueCtx = synchronized({
+        if (qc == null || qc.server == null) return null
+        return queueCfgAndCtxs.getOrElseUpdate(qc, createQueueCtx(qc))
+    })
+
+    private[amqp] def createQueueCtx(qc: QueueCfg): QueueCtx = {
+        val connWrapper: ConnectionWrapper = ConnectionMgr.getOrCreateConnection(qc.getServer)
+        if (connWrapper == null) return null
+
+        val ch: Channel = connWrapper.conn.createChannel()
+        val queueCtx: QueueCtx = new QueueCtx(ch, qc)
+        ch.addShutdownListener(queueCtx)
+
+        val queueName = qc.getName
+        ch.queueDeclare(queueName, qc.isDurable, qc.isExclusive, qc.isAutoDelete, null)
+        if (qc.getPreferFetchSize != null) {
+            ch.basicQos(qc.getPreferFetchSize)
+        }
+        val routeKey = qc.getRouteKey
+        for (ec <- qc.getExchanges.asScala) {
+            val exchangeName = StringUtils.defaultString(ec.getName, StringUtils.EMPTY)
+            ch.exchangeDeclare(exchangeName, ec.getExchangeType, ec.isDurable, ec.isAutoDelete, null)
+            ch.queueBind(queueName, exchangeName, routeKey)
+        }
+
+        ch.setDefaultConsumer(new ConsumerActor(ch, qc))
+
+        return queueCtx
+    }
+
+    def closeQueueCtx(qc: QueueCfg): QueueCtx = synchronized({
+        return queueCfgAndCtxs.remove(qc).map(ctx => {
+            ctx._ch.close(AMQP.CONNECTION_FORCED, "OK")
+            ctx
+        }).get
+    })
 }
 
 class QueueCtx(val _ch: Channel, val _queueCfg: QueueCfg) extends ShutdownListener {
@@ -214,14 +277,15 @@ class QueueCtx(val _ch: Channel, val _queueCfg: QueueCfg) extends ShutdownListen
             _info(sc, infoStr)
             return
         }
-        //        MQueueMgr.stopQueue(qc)
+        //        MQueueMgr.stopQueue(sc)
     }
 }
 
-object Responder {
+object QueueResponder {
     protected val log: Logger = LogManager.getLogger(this.getClass)
     private val failsafe: ActorRef = FailedMessageSqlStorage.instance
-    private val executor: ExecutorService = Executors.newFixedThreadPool(MiscUtils.AVAILABLE_PROCESSORS, MiscUtils.namedThreadFactory("Responder"))
+    private val executor: ExecutorService = Executors.newFixedThreadPool(MiscUtils.AVAILABLE_PROCESSORS,
+        MiscUtils.namedThreadFactory("QueueResponder"))
 
     override def finalize(): Unit = {
         executor.shutdownNow()
@@ -229,11 +293,21 @@ object Responder {
     }
 }
 
-class Responder extends Actor {
+class QueueResponder extends Actor {
     override def receive: Receive = {
         case (mc: MessageContext) => {
-            if (mc.isSucceeded) {
+            val queueCtx: QueueCtx = QueueCtx.getOrCreateQueueCtx(mc.queueCfg)
 
+            if (mc.isSucceeded) {
+                queueCtx._ch.basicAck(mc.getDelivery().getEnvelope.getDeliveryTag, false)
+                if (mc.getFailTimes > 0) {
+                    FailedMessageSqlStorage.instance.tell(mc, this.self)
+                }
+            } else {
+                FailedMessageSqlStorage.instance.tell(mc, this.self)
+                if (mc.isExceedFailTimes) {
+                    queueCtx._ch.basicAck(mc.getDelivery().getEnvelope.getDeliveryTag, false)
+                }
             }
         }
     }
