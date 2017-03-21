@@ -284,7 +284,8 @@ class QueueCtx(val _ch: Channel, val _queueCfg: QueueCfg) extends ShutdownListen
 object QueueResponder {
     protected val log: Logger = LogManager.getLogger(this.getClass)
     private val failsafe: ActorRef = FailedMessageSqlStorage.instance
-    private val executor: ExecutorService = Executors.newFixedThreadPool(MiscUtils.AVAILABLE_PROCESSORS, MiscUtils.namedThreadFactory("QueueResponder"))
+    private val executor: ExecutorService = Executors.newFixedThreadPool(MiscUtils.AVAILABLE_PROCESSORS,
+        MiscUtils.namedThreadFactory("QueueResponder"))
 
     override def finalize(): Unit = {
         executor.shutdownNow()
