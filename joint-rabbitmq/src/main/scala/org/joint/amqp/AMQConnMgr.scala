@@ -1,7 +1,7 @@
 package org.joint.amqp
 
 import java.util.Objects
-import java.util.concurrent.{ConcurrentHashMap, Executors}
+import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
 
 import com.rabbitmq.client._
 import com.rabbitmq.client.impl.nio.NioParams
@@ -48,11 +48,11 @@ object AMQConnMgr {
         connFactory.setPassword(sc.getPassword)
         connFactory.setVirtualHost(sc.getVirtualHost)
         connFactory.setAutomaticRecoveryEnabled(true)
-        connFactory.useNio()
-
-        val nioParams: NioParams = new NioParams()
-        nioParams.setNbIoThreads(Math.min(MiscUtils.AVAILABLE_PROCESSORS / 2, 2))
-        connFactory.setNioParams(nioParams)
+//        connFactory.useNio()
+//
+//        val nioParams: NioParams = new NioParams()
+//        nioParams.setNbIoThreads(Math.min(MiscUtils.AVAILABLE_PROCESSORS / 2, 2))
+//        connFactory.setNioParams(nioParams)
 
         return connFactory
     }
@@ -66,8 +66,9 @@ protected[amqp] class ConnContext(val sc: ServerCfg) extends ShutdownListener
 
     import AMQConnMgr._
 
-    var connFactory: ConnectionFactory = _
-    var conn: RecoverableConnection = _
+    protected var connFactory: ConnectionFactory = _
+    protected var conn: RecoverableConnection = _
+    protected var channel: RecoverableChannel = _
 
     val cfgAndChannels: collection.concurrent.Map[QueueCfg, Channel] =
         JConcurrentMapWrapper[QueueCfg, Channel](new ConcurrentHashMap())
@@ -81,9 +82,12 @@ protected[amqp] class ConnContext(val sc: ServerCfg) extends ShutdownListener
         return qc
     }
 
+    val consumerThread: ExecutorService = Executors.newSingleThreadExecutor()
+
     {
         this.connFactory = createConnFactory(sc)
-        this.conn = connFactory.newConnection(Executors.newSingleThreadExecutor(), s"conn-${sc.get()}").asInstanceOf
+        this.conn = connFactory.newConnection(consumerThread, s"conn-${sc.get()}").asInstanceOf
+        this.channel = conn.createChannel().asInstanceOf[RecoverableChannel]
     }
 
     def canEqual(other: Any): Boolean = other.isInstanceOf[ConnectionWrapper]
@@ -137,6 +141,7 @@ protected[amqp] class ConnContext(val sc: ServerCfg) extends ShutdownListener
     }
 
     override def close(): Unit = {
+        channel.close()
         conn.close()
     }
 }
