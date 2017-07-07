@@ -12,8 +12,10 @@ import org.joints.commons.ScriptUtils;
 import org.joints.rest.script.ScriptResLoader;
 import scala.Tuple2;
 import scala.collection.JavaConverters;
+import scala.collection.mutable.Buffer;
 import scala.reflect.internal.util.AbstractFileClassLoader;
 import scala.reflect.internal.util.BatchSourceFile;
+import scala.reflect.internal.util.SourceFile;
 import scala.reflect.io.Path;
 import scala.reflect.io.PlainFile;
 import scala.tools.nsc.Global;
@@ -21,7 +23,10 @@ import scala.tools.nsc.interpreter.IMain;
 import scala.tools.nsc.interpreter.Scripted;
 
 import javax.script.ScriptEngine;
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.Charset;
@@ -38,10 +43,9 @@ import java.util.stream.Collectors;
 public class ScalaResCompiler extends ScriptResLoader {
 
     private static final Logger log = LogManager.getLogger(ScalaResCompiler.class);
+
     public FileFilter getFileFilter() {
-        return new OrFileFilter(Arrays.asList(
-            new WildcardFileFilter("*.scala")
-        ));
+        return new OrFileFilter(Arrays.asList(new WildcardFileFilter("*.scala")));
     }
 
     protected Set<Resource> executeScriptFile(File file) {
@@ -77,13 +81,12 @@ public class ScalaResCompiler extends ScriptResLoader {
                 List<URL> clzPathList = Arrays.asList(ucl.getURLs()).stream()
                     .filter(Lambdas.wpf(url -> Paths.get(url.toURI()).toFile().isFile()))
                     .collect(Collectors.toList());
-                iMain.addUrlsToClassPath(JavaConverters.asScalaBuffer(clzPathList));
+                iMain.addUrlsToClassPath(JavaConverters.<URL>asScalaBuffer(clzPathList));
             }
 
-            Tuple2<Object, Global.Run> compileResult = iMain.compileSourcesKeepingRun(
-                JavaConverters.asScalaBuffer(Arrays.asList(
-                    new BatchSourceFile(new PlainFile(new Path(file)), scriptStr.toCharArray()))
-                ));
+            List<SourceFile> batchSourceFiles = Arrays.asList(new BatchSourceFile(new PlainFile(new Path(file)), scriptStr.toCharArray()));
+            Buffer<SourceFile> batchSourceFileBuf = JavaConverters.<SourceFile>asScalaBuffer(batchSourceFiles);
+            Tuple2<Object, Global.Run> compileResult = iMain.compileSourcesKeepingRun(batchSourceFileBuf.toSeq());
             Global.Run run = compileResult._2();
             String compileInfo = baos.toString(Charset.defaultCharset().name());
             log.info(compileInfo);

@@ -1,7 +1,7 @@
 package org.joint.amqp
 
 import java.util.Objects
-import java.util.concurrent.{ConcurrentHashMap, Executors}
+import java.util.concurrent.{ConcurrentHashMap, ExecutorService, ForkJoinPool}
 
 import com.rabbitmq.client._
 import com.rabbitmq.client.impl.nio.NioParams
@@ -28,6 +28,7 @@ object AMQConnMgr {
     def updateConnCtx(sc: ServerCfg): ConnContext = synchronized({
         val oldConnCtx: ConnContext = cfgAndConnCtxs(sc)
         if (oldConnCtx == null) return connCtx(sc)
+        oldConnCtx.close()
         val newConnCtx: ConnContext = connCtx(sc)
         newConnCtx.consumeForQueues(oldConnCtx.cfgAndChannels.keys)
         return newConnCtx
@@ -57,6 +58,9 @@ object AMQConnMgr {
         return connFactory
     }
 
+    private val consumerThreadPool: ExecutorService = new ForkJoinPool()
+
+    def getConsumerWorkServiceExecutor(): ExecutorService = consumerThreadPool
 }
 
 protected[amqp] class ConnContext(val sc: ServerCfg) extends ShutdownListener
@@ -66,24 +70,28 @@ protected[amqp] class ConnContext(val sc: ServerCfg) extends ShutdownListener
 
     import AMQConnMgr._
 
-    var connFactory: ConnectionFactory = _
-    var conn: RecoverableConnection = _
+    private var connFactory: ConnectionFactory = _
+    private var conn: RecoverableConnection = _
 
     val cfgAndChannels: collection.concurrent.Map[QueueCfg, Channel] =
         JConcurrentMapWrapper[QueueCfg, Channel](new ConcurrentHashMap())
 
     def consumeForQueues(qcs: Iterable[QueueCfg]): Iterable[QueueCfg] = {
-        return if (qcs.isEmpty) qcs else qcs.map(this.consumeForQueue(_))
+        return if (qcs.isEmpty) qcs else qcs.map(consumeForQueue(_))
     }
 
     def consumeForQueue(qc: QueueCfg): QueueCfg = {
         if (qc == null || !qc.isEnabled) return qc
+        //TODO
         return qc
     }
 
     {
         this.connFactory = createConnFactory(sc)
-        this.conn = connFactory.newConnection(Executors.newSingleThreadExecutor(), s"conn-${sc.get()}").asInstanceOf
+        this.conn = connFactory.newConnection(getConsumerWorkServiceExecutor(), s"conn-${sc.get()}").asInstanceOf
+        this.conn.addShutdownListener(this)
+        this.conn.addRecoveryListener(this)
+        this.conn.addBlockedListener(this)
     }
 
     def canEqual(other: Any): Boolean = other.isInstanceOf[ConnectionWrapper]
@@ -101,16 +109,14 @@ protected[amqp] class ConnContext(val sc: ServerCfg) extends ShutdownListener
         val reason: Object = cause.getReason
 
         reason match {
-            case (close: AMQP.Connection.Close) => {
+            case (close: AMQP.Connection.Close) =>
                 if (AMQP.CONNECTION_FORCED == close.getReplyCode && "OK" == close.getReplyText) {
                     val infoStr = s"\n force to close connection: to server: \n\t $sc"
                     log.error(infoStr)
                     _info(sc, infoStr)
                 }
-            }
-            case unknown@_ => {
+            case unknown@_ =>
                 log.error(s"$unknown closed connection to server: \n\t $sc")
-            }
         }
     }
 

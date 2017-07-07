@@ -18,6 +18,7 @@
         <module>joints-jersey</module>
         <module>joint-rabbitmq</module>
         <module>joints-tests</module>
+        <module>joints-spring-mvc-scala</module>
     </modules>
 
     <dependencies>

@@ -9,6 +9,7 @@ import org.junit.Test;
 import scala.collection.JavaConverters;
 import scala.reflect.internal.util.BatchSourceFile;
 import scala.reflect.internal.util.ScalaClassLoader;
+import scala.reflect.internal.util.SourceFile;
 import scala.reflect.io.VirtualFile;
 import scala.tools.nsc.Global;
 import scala.tools.nsc.interpreter.IMain;
@@ -180,7 +181,6 @@ public class ScriptTests {
         NashornScriptEngine nse = (NashornScriptEngine) nsef.getScriptEngine();
 
         nse.getContext().setWriter(new PrintWriter(System.out));
-//        nse.eval("var double = i=>i * 2");
         nse.put("now", new Date());
         nse.eval("print(now);");
     }
@@ -194,7 +194,9 @@ public class ScriptTests {
         String loadResAsString = FileUtils.readFileToString(new File("src/test/resources/ScalaRes.scala"), Charset.defaultCharset());
 
         Global.Run run = iMain.compileSourcesKeepingRun(
-            JavaConverters.asScalaBuffer(Arrays.asList(new BatchSourceFile(new VirtualFile("src/main/webapp/WEB-INF/scripts/ScalaRes.scala", "./"), loadResAsString.toCharArray())))
+            JavaConverters.<SourceFile>asScalaBuffer(Arrays.<SourceFile>asList(
+                new BatchSourceFile(
+                    new VirtualFile("src/main/webapp/WEB-INF/scripts/ScalaRes.scala", "./"), loadResAsString.toCharArray())))
         )._2();
         Assert.assertNotNull(run);
 
@@ -202,7 +204,6 @@ public class ScriptTests {
         Assert.assertNotNull(scalaRes);
 
         System.out.println(iMain.classLoader().classNameToPath("ScalaRes"));
-
         Assert.assertNotNull(Class.forName("ScalaRes"));
     }
 }
