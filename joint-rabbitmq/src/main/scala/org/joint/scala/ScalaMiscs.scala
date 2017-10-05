@@ -7,7 +7,7 @@ object ScalaMiscs {
     type ReflectiveCloseable = {
         def close()
     }
-    def try_[A <: ReflectiveCloseable, B](closeAble: A)(f: (A) => B): B = {
+    @inline def try_[A <: ReflectiveCloseable, B](closeAble: A)(f: (A) => B): B = {
         try {
             f(closeAble)
         } finally {

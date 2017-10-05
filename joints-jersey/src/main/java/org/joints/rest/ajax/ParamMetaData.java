@@ -30,7 +30,7 @@ public class ParamMetaData implements Serializable {
 
 	@Override
 	public String toString() {
-		return "ParamMetaData [source=" + source + ", sourceName=" + sourceName + ", rawType=" + rawType + ", type=" + type + "]";
+		return "ParamMetaData [source=" + source + ", sourceName=" + sourceName + ", rawType=" + rawType + ", _type=" + type + "]";
 	}
 	
 }

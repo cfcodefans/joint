@@ -140,13 +140,9 @@ class ConnectionWrapper(val name: String,
 
     def canEqual(other: Any): Boolean = other.isInstanceOf[ConnectionWrapper]
 
-    override def hashCode(): Int = {
-        return Objects.hash(name, sc)
-    }
+    override def hashCode(): Int = Objects.hash(name, sc)
 
-    override def compareTo(o: ConnectionWrapper): Int = {
-        return Objects.compare[String](name, o.name, Comparator.naturalOrder())
-    }
+    override def compareTo(o: ConnectionWrapper): Int = Objects.compare[String](name, o.name, Comparator.naturalOrder())
 
     override def shutdownCompleted(cause: ShutdownSignalException): Unit = {
         val reason: Object = cause.getReason
@@ -277,7 +273,6 @@ class QueueCtx(val _ch: Channel, val _queueCfg: QueueCfg) extends ShutdownListen
             _info(sc, infoStr)
             return
         }
-        //        MQueueMgr.stopQueue(sc)
     }
 }
 

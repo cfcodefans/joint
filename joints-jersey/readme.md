@@ -35,16 +35,16 @@ http://localhost:8080/rest/v1/ajax?appName=rest-ajax
     "children" : [ ],
     "methods" : [ {
       "jaxrsType" : "RESOURCE_METHOD","name" : "getAdd","returnType" : "int", "httpMethod" : "GET",
-      "params" : [ {"source" : "PATH","sourceName" : "a","rawType" : "int","type" : "int" }
-      , {"source" : "PATH","sourceName" : "b","rawType" : "int","type" : "int"} ],
+      "params" : [ {"source" : "PATH","sourceName" : "a","rawType" : "int","_type" : "int" }
+      , {"source" : "PATH","sourceName" : "b","rawType" : "int","_type" : "int"} ],
       "isArray" : false,
       "produceMediaTypes" : [ "text/plain" ],
       "consumedMediaTypes" : [ ]
     }, {
       "jaxrsType" : "RESOURCE_METHOD",
       "name" : "postAdd", "returnType" : "int", "httpMethod" : "POST",
-      "params" : [ {"source" : "PATH", "sourceName" : "a", "rawType" : "int", "type" : "int"}
-      , {"source" : "PATH", "sourceName" : "b", "rawType" : "int", "type" : "int"} ],
+      "params" : [ {"source" : "PATH", "sourceName" : "a", "rawType" : "int", "_type" : "int"}
+      , {"source" : "PATH", "sourceName" : "b", "rawType" : "int", "_type" : "int"} ],
       "isArray" : false,
       "produceMediaTypes" : [ "text/plain" ],
       "consumedMediaTypes" : [ ]
@@ -63,7 +63,7 @@ and these restful api interfaces are wrapped by rest.js so they could be invoked
 <body>
 <script src="../js/jquery-2.1.1.js"></script>
 <script src="../js/rest.js" ></script>
-<script type="text/javascript">
+<script _type="text/javascript">
     console.info(RS.ctx.TestsRes.getAdd //mapped to TestsRes.getAdd
         .with_a(1) // mapped to parameter a
         .with_b(2) // mapped to parameter b
@@ -82,16 +82,16 @@ org.joints.rest.script.ScriptResLoader as a jersey restful resource configuraion
 certain folder; when some script files are placed or modified, it will reload Jersey container to reload 
 the changed restful api interfaces.
 Example of Nashorn Javascript (Javascript is such bad example that Jersey could not properly struct the restful api interface 
-since Javascript has not static type and annotations)
+since Javascript has not static _type and annotations)
 ```javascript
-var Resource = Java.type("org.glassfish.jersey.server.model.Resource");
-var ResourceMethod = Java.type("org.glassfish.jersey.server.model.ResourceMethod");
+var Resource = Java._type("org.glassfish.jersey.server.model.Resource");
+var ResourceMethod = Java._type("org.glassfish.jersey.server.model.ResourceMethod");
 
-var ContainerRequestContext = Java.type("javax.ws.rs.container.ContainerRequestContext");
-var MediaType = Java.type("javax.ws.rs.core.MediaType");
-var IResourceGenerator = Java.type("org.joints.rest.script.ScriptResLoader.IResourceGenerator");
-var Arrays = Java.type(java.util.Arrays.class.getName());
-var HashSet = Java.type(java.util.HashSet.class.getName());
+var ContainerRequestContext = Java._type("javax.ws.rs.container.ContainerRequestContext");
+var MediaType = Java._type("javax.ws.rs.core.MediaType");
+var IResourceGenerator = Java._type("org.joints.rest.script.ScriptResLoader.IResourceGenerator");
+var Arrays = Java._type(java.util.Arrays.class.getName());
+var HashSet = Java._type(java.util.HashSet.class.getName());
 load(current_path + "/rest-utils.jsx");
 function apply(resourceConfig) { //ScriptResLoader
     var resourceBuilder = Resource.builder();

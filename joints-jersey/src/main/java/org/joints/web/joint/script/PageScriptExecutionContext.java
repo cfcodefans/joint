@@ -43,7 +43,7 @@ public class PageScriptExecutionContext extends ScriptExecutionContext {
 								 final HttpServletResponse resp, 
 								 final String basePathStr,
 								 final ScriptContext sc) {
-		super(null, req, resp, basePathStr, sc, scriptElement.attr("type"));
+		super(null, req, resp, basePathStr, sc, scriptElement.attr("_type"));
 		super.scriptStr = getScriptStr(req.getServletContext(), basePathStr, scriptElement);
 		this.document = document;
 		this.scriptElement = scriptElement;

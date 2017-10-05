@@ -60,7 +60,7 @@ public class FileMonitor extends Observable implements Runnable, AutoCloseable {
             log.error("WatchKey not recognized! " + wk.watchable());
             return Collections.emptyMap();
         }
-        return MiscUtils.map(StandardWatchEventKinds.ENTRY_DELETE,
+        return MiscUtils$.map(StandardWatchEventKinds.ENTRY_DELETE,
             watchEvents.stream().filter(we -> ENTRY_DELETE.equals(we.kind())).map(we -> (Path) we.context()).map(dir::resolve).collect(Collectors.toSet()),
             StandardWatchEventKinds.ENTRY_CREATE,
             watchEvents.stream().filter(we -> ENTRY_CREATE.equals(we.kind())).map(we -> (Path) we.context()).map(dir::resolve).collect(Collectors.toSet()),

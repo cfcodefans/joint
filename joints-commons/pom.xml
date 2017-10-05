@@ -9,7 +9,7 @@
     <version>0.0.1-SNAPSHOT</version>
 
     <properties>
-        <scala-ver>2.12.1</scala-ver>
+        <scala-ver>2.12.2</scala-ver>
     </properties>
 
     <dependencies>

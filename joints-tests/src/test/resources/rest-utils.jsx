@@ -1,4 +1,4 @@
-var Endpoint = Java.type("org.glassfish.jersey.server.internal.process.Endpoint");
+var Endpoint = Java._type("org.glassfish.jersey.server.internal.process.Endpoint");
 
 function _endPoint(func) {
     var ResourceType = Java.extend(Endpoint, {
